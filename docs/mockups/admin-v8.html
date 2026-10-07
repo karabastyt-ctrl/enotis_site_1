@@ -1,0 +1,487 @@
+<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ЭНОТИС — админка, макет v8 (режим сайта, поп-ап, статичная страница, вина)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Golos+Text:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+.site{--bg:#F5EFE6;--paper:#FBF8F3;--ink:#2E2422;--mute:#6E625C;--bur:#3B1820;--bur2:#2A1016;--brown:#4E443B;--gold:#C9A15A;--line:#DDD2C4;--tag:rgba(30,40,60,.62);
+ container-type:inline-size;background:var(--bg);color:var(--ink);font:400 17px/1.6 "Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;height:100%;position:relative;overflow:hidden}
+.s-scroll{height:100%;overflow:auto;position:relative}
+.site *{box-sizing:border-box}
+.site h1,.site h2,.site h3,.site .serif{font-family:"Playfair Display",Georgia,"Times New Roman",serif;font-weight:600;margin:0}
+.site a{color:inherit}
+.s-head{position:sticky;top:0;z-index:5;background:rgba(245,239,230,.94);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:12px 28px;min-height:56px}
+.s-head .back{font-size:15px;color:var(--bur);cursor:pointer;white-space:nowrap}
+.s-head .ttl{font-family:"Playfair Display",Georgia,serif;font-weight:600;font-size:19px;color:var(--bur);cursor:pointer;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.s-head .burger{display:none;font-size:22px;cursor:pointer;color:var(--bur);background:none;border:0}
+.s-wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+.s-hub{text-align:center;padding:56px 0 18px}
+.s-eyebrow{letter-spacing:.18em;text-transform:uppercase;font-size:14px;font-weight:600;color:#4A3F3A}
+.s-hub h1{font-size:46px;line-height:1.15;color:var(--bur);margin:8px 0 12px}
+.s-lead{color:#4A3F3A;max-width:62ch;margin:0 auto;font-size:18px}
+.s-intro{max-width:760px;margin:26px auto 0;color:#3E3431}
+.s-intro h2{font-size:28px;color:var(--bur);margin-bottom:8px;text-align:center}
+.s-tabs{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:30px 0 26px}
+.s-tab{border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:8px 18px;font-size:16px;cursor:pointer;color:var(--ink);font-family:inherit}
+.s-tab b{color:var(--bur);margin-left:6px}
+.s-tab.on{background:var(--bur);border-color:var(--bur);color:#F5EFE6}.s-tab.on b{color:var(--gold)}
+.s-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin:10px 0 36px}
+.s-tile{background:var(--bur);cursor:pointer;display:flex;flex-direction:column;transition:transform .15s}
+.s-tile:hover{transform:translateY(-2px)}
+.s-tile.alt{background:var(--brown)}
+.ph{aspect-ratio:3/2;position:relative;overflow:hidden;display:block}
+.ph svg{position:absolute;inset:0;width:100%;height:100%}
+.tag{position:absolute;top:14px;left:14px;background:var(--tag);color:var(--gold);font-size:13px;letter-spacing:.12em;text-transform:uppercase;padding:5px 12px}
+.s-tile .bar{padding:22px 24px 20px;color:#F5EFE6;display:flex;align-items:flex-end;gap:12px;border-top:3px solid rgba(255,255,255,.08)}
+.s-tile .bar div{flex:1}
+.s-tile .bar h3{font-size:25px;text-transform:uppercase;letter-spacing:.02em;line-height:1.2}
+.s-tile .bar small{display:block;color:var(--gold);text-transform:uppercase;letter-spacing:.08em;font-size:14px;margin-top:6px}
+.s-tile.alt .bar small{color:#CFC4B6}
+.s-tile .arr{color:var(--gold);font-size:26px;line-height:1}
+.s-page-h{padding:40px 0 4px;text-align:center}
+.s-page-h .s-eyebrow{margin-bottom:6px}
+.s-page-h h1{font-size:44px;color:var(--bur)}
+.s-sec-h{font-family:"Playfair Display",Georgia,serif;font-size:28px;color:var(--bur);text-align:center;margin:44px 0 18px}
+.s-cards .s-tile .bar h3{font-size:21px}
+.s-svcs{display:grid;grid-template-columns:repeat(2,1fr);gap:24px}
+.s-svc{background:var(--paper);border:1px solid var(--line);padding:26px;display:flex;flex-direction:column}
+.s-svc h3{font-size:24px;color:var(--bur)}
+.s-svc p{margin:8px 0 16px;color:#4A3F3A;flex:1}
+.s-price{font-family:"Playfair Display",Georgia,serif;font-size:30px;color:var(--bur)}.s-price span{font-family:"Golos Text",system-ui,sans-serif;font-size:15px;color:var(--mute);margin-left:6px}
+.s-btn{display:inline-block;background:var(--bur);color:#F5EFE6;border:0;padding:13px 26px;font:600 15px "Golos Text",system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;text-decoration:none;text-align:center}
+.s-btn.ghost{background:transparent;color:var(--bur);border:1px solid var(--bur)}
+.s-svc .s-btn{margin-top:14px;align-self:flex-start}
+.s-who{font-size:13px;color:var(--mute);margin-top:10px}
+.s-pay{background:#EDE4D7;margin:44px 0;padding:30px 34px;display:flex;align-items:center;gap:24px}
+.s-pay div{flex:1}.s-pay h3{font-size:26px;color:var(--bur)}.s-pay p{margin:6px 0 0;color:#4A3F3A}
+.s-map{margin:10px 0 0;border:1px solid var(--line);aspect-ratio:21/8;background:repeating-linear-gradient(45deg,#ECE3D6 0 12px,#E6DCCD 12px 24px);display:grid;place-items:center;color:var(--mute);font-size:15px;text-align:center;padding:12px}
+.s-foot{background:#2A1016;color:#D8CCBF;margin-top:50px;padding:36px 28px;font-size:14px}
+.s-foot .in{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:2fr 1fr;gap:20px}
+.s-foot b{font-family:"Playfair Display",Georgia,serif;font-size:20px;color:#F5EFE6;font-weight:600}
+.s-foot .docs a{display:block;cursor:pointer;color:var(--gold);text-decoration:none;margin-bottom:6px}
+.s-foot .req{color:#A99B8E;margin-top:12px;font-size:13px}
+.s-doc{max-width:760px;margin:0 auto;padding:44px 0}.s-doc h1{font-size:38px;color:var(--bur);margin-bottom:16px}
+.s-cookie{position:sticky;bottom:0;z-index:6;background:#2A1016;color:#EDE4D7;display:flex;gap:14px;align-items:center;padding:12px 20px;font-size:14px}
+.s-cookie span{flex:1}.s-cookie a{color:var(--gold);cursor:pointer}.s-cookie button{background:var(--gold);color:#2A1016;border:0;padding:8px 16px;font-weight:600;cursor:pointer}
+.s-ov{position:absolute;inset:0;z-index:20;background:rgba(30,15,18,.55);display:flex;align-items:center;justify-content:center;padding:24px}
+.s-modal{background:var(--paper);width:640px;max-width:100%;max-height:100%;overflow:auto;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.s-modal .x{position:absolute;top:10px;right:12px;font-size:26px;background:rgba(251,248,243,.9);border:0;cursor:pointer;color:var(--bur);width:36px;height:36px;border-radius:50%;z-index:2}
+.s-modal .in{padding:24px 28px 28px}
+.s-modal h2{font-size:30px;color:var(--bur)}.s-modal .sub{color:var(--mute);text-transform:uppercase;letter-spacing:.08em;font-size:13px;margin:4px 0 12px}
+.s-place{background:#EDE4D7;padding:14px 16px;margin:16px 0}.s-place b{display:block;color:var(--bur);margin-bottom:4px}
+.s-src{font-size:12px;color:var(--mute);margin:10px 0}
+.s-phead{max-width:980px;margin:0 auto;padding:40px 0 0}
+.s-ptop{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:36px;align-items:start}
+.s-phead .s-route{max-width:780px;margin:30px auto 8px}
+.s-phead .s-eyebrow{margin-bottom:6px}
+.s-phead h1{font-size:44px;color:var(--bur);margin:0 0 18px}
+.s-phead .ph{border:1px solid var(--line)}
+.s-ptext{color:#3E3431}
+.s-ptext p{margin:0 0 12px}
+.s-wines{max-width:900px;margin:0 auto 36px;display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.s-wine{background:#fff;display:flex;flex-direction:column;box-shadow:0 1px 0 var(--line)}
+.s-wine.clk{cursor:pointer}.s-wine.clk:hover{box-shadow:0 8px 24px rgba(59,24,32,.12)}
+.wph{aspect-ratio:4/5;background:#E6D8C3;display:grid;place-items:center;overflow:hidden}
+.wph svg{height:88%;width:auto}
+.wph.big{aspect-ratio:auto;height:320px}
+.s-wine .wb{padding:16px 18px 18px;display:flex;flex-direction:column;gap:3px;flex:1}
+.s-wine h4{margin:0 0 4px;font:500 20px "Golos Text",system-ui,sans-serif;color:#7A5530}
+.s-wine .wm{text-transform:uppercase;letter-spacing:.08em;font-size:13px;color:#A08A72}
+.s-wine .wt{font-weight:600;font-size:15px;margin-top:4px}
+.s-wine .wg{font-size:15px;color:#7A6F68}
+.s-wine .wp{font:600 22px "Golos Text",system-ui,sans-serif;margin-top:auto;padding-top:12px}
+@container (max-width:767px){.s-ptop{grid-template-columns:1fr;gap:18px}}
+@container (max-width:599px){.s-phead h1{font-size:32px}.s-wines{grid-template-columns:repeat(2,1fr);gap:12px}.s-wine .wb{padding:10px 10px 12px}.s-wine h4{font-size:16px}.s-wine .wm{font-size:11px}.s-wine .wt,.s-wine .wg{font-size:13px}.s-wine .wp{font-size:18px}}
+.s-cardm{padding:0}
+.s-cbar{position:sticky;top:0;z-index:4;display:flex;align-items:center;gap:12px;padding:10px 14px 10px 18px;background:rgba(251,248,243,.97);border-bottom:1px solid var(--line);min-height:52px}
+.s-cbar .bk{background:none;border:0;color:var(--bur);font:600 15px "Golos Text",system-ui,sans-serif;cursor:pointer;padding:6px 2px;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.s-cbar .bk span{font-size:22px;line-height:1;margin-top:-2px}
+.s-cbar .ct{flex:1;text-align:right;font-family:"Playfair Display",Georgia,serif;font-weight:600;color:var(--bur);font-size:16px;opacity:0;transition:opacity .2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.s-cbar .ct.show{opacity:1}
+.s-cbar .xx{background:none;border:0;font-size:26px;color:var(--bur);cursor:pointer;width:34px;height:34px;line-height:1;flex:none}
+.s-route{margin:22px 0 8px}
+.s-route .lb{letter-spacing:.16em;text-transform:uppercase;font-size:13px;font-weight:600;color:#A67C3D}
+.s-route p{margin:8px 0 14px}
+.s-mapc{height:260px;border:1px solid var(--line);background:#ECE3D6;position:relative;z-index:0}
+.s-mapc .fb{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--mute);font-size:14px;padding:12px}
+.s-maphint{font-size:12px;color:var(--mute);margin-top:6px}
+.s-route .btns{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.s-route .btns .s-btn{width:100%;text-transform:none;letter-spacing:.02em;font-size:16px;padding:14px 12px}
+@container (max-width:599px){.s-cbar .xx{display:none}.s-route .btns{grid-template-columns:1fr}.s-mapc{height:220px}.s-cbar{padding-left:14px}}
+.s-paym{width:460px}
+.s-paym .in{text-align:center}
+.s-qr{width:170px;height:170px;margin:14px auto 6px;background:#fff;border:1px solid var(--line);padding:8px}
+.s-paym .s-btn{display:block;width:100%;margin-top:10px}
+.s-req{text-align:left;margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+.s-req summary{cursor:pointer;color:var(--bur);font-weight:600}
+.s-req dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px;margin:10px 0}.s-req dt{color:var(--mute)}.s-req dd{margin:0;word-break:break-all}
+.s-note{font-size:12px;color:var(--mute);margin-top:12px}.s-note a{color:var(--bur);cursor:pointer}
+.s-toast{position:absolute;left:50%;bottom:70px;transform:translateX(-50%);background:var(--bur2);color:#F5EFE6;padding:12px 18px;z-index:30;font-size:14px;max-width:90%;text-align:center}
+.s-menu{position:absolute;top:56px;right:0;left:0;z-index:7;background:var(--paper);border-bottom:1px solid var(--line);padding:8px 0}
+.s-menu a{display:block;padding:10px 24px;cursor:pointer;text-decoration:none}
+@container (max-width:1023px){.s-grid{grid-template-columns:repeat(2,1fr);gap:20px}.s-hub h1{font-size:38px}}
+@container (max-width:599px){
+ .site{font-size:16px}.s-head{padding:10px 16px}.s-head .burger{display:block}.s-wrap{padding:0 16px}
+ .s-grid,.s-svcs{grid-template-columns:1fr;gap:16px}.s-hub{padding:32px 0 8px}.s-hub h1{font-size:31px}.s-lead{font-size:16px}
+ .s-tabs{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;margin:22px -16px 18px;padding:0 16px}.s-tab{white-space:nowrap}
+ .s-tile .bar h3{font-size:22px}.s-page-h h1{font-size:32px}.s-pay{flex-direction:column;align-items:flex-start;padding:22px}
+ .s-foot .in{grid-template-columns:1fr}
+ .s-ov{padding:0;align-items:stretch}.s-modal{width:100%;max-height:none}
+ .s-ov.sheet{align-items:flex-end}.s-ov.sheet .s-modal{max-height:92%;border-radius:14px 14px 0 0}
+}
+.site [data-el].sel{outline:3px solid #B0414F;outline-offset:2px}
+.site.pv [data-el]:hover{outline:1px dashed #B0414F;outline-offset:2px}
+
+:root{--a-bg:#F1ECE5;--a-pan:#FFFFFF;--a-ink:#2A2522;--a-mute:#7A6F68;--a-line:#E3DBD0;--a-acc:#4A1F27;--a-acc2:#6B2C37;--a-soft:#F4E9EA;--a-ok:#2E7D4F;--a-bad:#B3261E}
+html,body{margin:0;height:100%;background:var(--a-bg);color:var(--a-ink);font:400 14px/1.45 "Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+*{box-sizing:border-box}
+.top{height:54px;display:flex;align-items:center;gap:14px;padding:0 16px;background:var(--a-pan);border-bottom:1px solid var(--a-line)}
+.logo{width:30px;height:30px;border-radius:7px;background:var(--a-acc);color:#F5EFE6;display:grid;place-items:center;font-family:"Playfair Display",Georgia,serif;font-weight:700}
+.top .nm{font-weight:600}.top .st{font-size:13px;color:var(--a-ok);margin-left:8px}.top .st.dirty{color:#A05A00}
+.sp{flex:1}
+.btn{border:1px solid var(--a-line);background:var(--a-pan);color:var(--a-ink);padding:7px 14px;border-radius:7px;cursor:pointer;font:500 13px "Golos Text",system-ui,sans-serif}
+.btn.pri{background:var(--a-acc);border-color:var(--a-acc);color:#fff}.btn.pri:hover{background:var(--a-acc2)}
+.btn.sm{padding:4px 9px;font-size:12px}.btn.bad{color:var(--a-bad)}
+.cols{display:grid;grid-template-columns:300px 420px 1fr;height:calc(100% - 54px - 26px)}
+.tree,.form{background:var(--a-pan);border-right:1px solid var(--a-line);overflow:auto}
+.secs{padding:12px;border-bottom:1px solid var(--a-line);background:#FAF7F3}
+.secs .ttl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--a-mute);margin-bottom:8px;display:flex;justify-content:space-between}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{border:1px solid var(--a-line);background:#fff;border-radius:999px;padding:4px 11px;cursor:pointer;font-size:13px}
+.pill.on{background:var(--a-acc);border-color:var(--a-acc);color:#fff}.pill.off{opacity:.5}
+.pill.add{border-style:dashed;color:var(--a-acc)}
+.tw{padding:8px 6px 20px}
+.grp{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--a-mute);padding:12px 10px 4px;display:flex;justify-content:space-between}
+.row{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:7px;cursor:pointer;user-select:none}
+.row:hover{background:#F7F2EC}.row.sel{background:var(--a-soft);box-shadow:inset 3px 0 0 var(--a-acc)}
+.row .h{color:#B9AEA4;cursor:grab;font-size:12px;width:12px}
+.row .tg{width:14px;color:var(--a-mute);font-size:11px}
+.row .dot{width:8px;height:8px;border-radius:50%;background:var(--a-ok);flex:none}.row .dot.no{background:transparent;border:1px solid #B9AEA4}
+.row .lb{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .ty{font-size:11px;color:var(--a-mute);white-space:nowrap}
+.row .ic{color:#B9AEA4;font-size:12px;padding:0 2px}.row .ic:hover{color:var(--a-acc)}
+.row.hid .lb{opacity:.45}
+.kids{margin-left:16px;border-left:1px dashed var(--a-line);padding-left:4px}
+.addel{color:var(--a-acc);font-size:13px;padding:6px 10px;cursor:pointer}
+.menu{background:#fff;border:1px solid var(--a-line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.08);margin:2px 8px 8px;padding:4px}
+.menu div{padding:6px 10px;border-radius:6px;cursor:pointer}.menu div:hover{background:#F7F2EC}.menu div.dis{color:#C2B8AE;cursor:not-allowed}
+.form .in{padding:18px 20px 40px}
+.crumb{font-size:12px;color:var(--a-mute)}.ftitle{font-family:"Playfair Display",Georgia,serif;font-size:21px;margin:2px 0 14px;color:var(--a-acc)}
+.fld{margin-bottom:14px}.fld>label{display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:5px}
+.fld>label i{font-style:normal;font-weight:400;color:var(--a-mute)}.fld>label i.over{color:var(--a-bad)}
+.fld input[type=text],.fld input[type=number],.fld textarea,.fld select{width:100%;border:1px solid var(--a-line);border-radius:7px;padding:8px 10px;font:inherit;color:inherit;background:#fff}
+.fld textarea{min-height:80px;resize:vertical}
+.hintx{font-size:12px;color:var(--a-mute);margin-top:4px}
+.sw{display:flex;align-items:center;gap:8px;margin-bottom:12px;cursor:pointer}.sw input{accent-color:var(--a-acc)}
+.seg{display:flex;border:1px solid var(--a-line);border-radius:8px;overflow:hidden;margin-bottom:6px}.seg label{flex:1;text-align:center;padding:7px;cursor:pointer;font-size:13px}.seg input{display:none}.seg label:has(input:checked){background:var(--a-acc);color:#fff}
+.box{border:1px solid var(--a-line);border-radius:9px;padding:12px;margin-bottom:12px;background:#FCFAF7}
+.box h4{margin:0 0 10px;font-size:13px}
+.pm{display:grid;grid-template-columns:14px 18px 1fr auto;gap:8px;align-items:center;border:1px solid var(--a-line);border-radius:8px;padding:8px;margin-bottom:6px;background:#fff}
+.pm .h{cursor:grab;color:#B9AEA4}.pm .nm2{font-weight:600}.pm .sub{grid-column:3/5}
+.pm input[type=text]{width:100%;border:1px solid var(--a-line);border-radius:6px;padding:6px 8px;font:inherit;margin-top:4px}
+.photo{display:flex;gap:10px;align-items:center}.photo .th{width:120px;aspect-ratio:3/2;border-radius:6px;overflow:hidden;position:relative;border:1px solid var(--a-line)}
+.pvcol{display:flex;flex-direction:column;overflow:hidden}
+.pvbar{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--a-pan);border-bottom:1px solid var(--a-line);font-size:12px;color:var(--a-mute)}
+.dv{display:flex;gap:3px;background:#F3EEE8;padding:3px;border-radius:7px}.dv button{border:0;background:transparent;padding:4px 10px;border-radius:5px;cursor:pointer;font:500 12px "Golos Text",system-ui,sans-serif;color:var(--a-ink)}.dv button.on{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.pvst{flex:1;display:flex;justify-content:center;padding:14px;overflow:hidden}
+.frm{background:#fff;box-shadow:0 6px 24px rgba(0,0,0,.12);transform-origin:top center;flex:none;border-radius:6px;overflow:hidden}
+.foot{height:26px;font-size:11px;color:var(--a-mute);display:flex;align-items:center;gap:16px;padding:0 16px;border-top:1px solid var(--a-line);background:var(--a-pan)}
+.toastA{position:fixed;left:50%;bottom:40px;transform:translateX(-50%);background:var(--a-acc);color:#fff;padding:10px 16px;border-radius:8px;z-index:99;font-size:13px}
+.drag-over{outline:2px dashed var(--a-acc)}
+.new{display:inline-block;font-size:10px;background:#F6E7C8;color:#7A5300;border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:middle;font-weight:600}
+</style></head><body>
+<div class="top"><div class="logo">Э</div><span class="nm" id="nm"></span><span class="st" id="st">Все изменения сохранены</span><span class="sp"></span><button class="btn" id="open">Открыть сайт</button><button class="btn pri" id="save">Сохранить</button></div>
+<div class="cols"><aside class="tree" id="tree"></aside><section class="form" id="form"></section>
+<section class="pvcol"><div class="pvbar"><span>Так увидит посетитель. Нажмите на любой элемент, чтобы изменить его</span><span class="sp"></span><span>Адрес:</span><select id="pvdom" class="btn sm"></select><div class="dv" id="dv"><button data-w="1280" class="on">Компьютер</button><button data-w="768">Планшет</button><button data-w="390">Телефон</button></div></div>
+<div class="pvst" id="pvst"><div class="frm" id="frm"><div id="pv" style="height:100%"></div></div></div></section></div>
+<div class="foot"><span>Движок 1.4.0 · схема базы v6</span><span>Макет для Вадима: данные тестовые, сохранение имитируется</span></div>
+<script>
+const MAPS={google:'Google Картах',yandex:'Яндекс Картах'};
+const COORD={alaverdi:'42.0325,45.3771',gremi:'42.0128,45.6553',nekresi:'41.9631,45.7770',dzhvari:'41.8383,44.7330',gelati:'42.2945,42.7685','shio-mgvime':'41.8690,44.6262',studenica:'43.4866,20.5317',zica:'43.6939,20.6461',decani:'42.5464,20.2658',meteora:'39.7217,21.6306','osios-loukas':'38.3953,22.7469'};
+const DATA={
+ siteTitle:'Обители · мировой агрегатор',
+ hub:{eyebrow:'Православные обители',title:'Монастыри мира',lead:'Монастыри Грузии, Сербии и Греции: история, святыни, онлайн-молебны и экскурсии. Выберите страну и нажмите на обитель.'},
+ domains:[{host:'obiteli.site',mode:'all',title:'Обители · мировой агрегатор'},{host:'georgia.obiteli.site',mode:'gruziya',title:'Монастыри Грузии'},{host:'serbia.obiteli.site',mode:'serbiya',title:'Монастыри Сербии'}],
+ owners:[{id:1,name:'ИП Тестовый (Грузия)',country:'GE',tax:'405000000',reg:'',addr:'Тбилиси',email:'info@obiteli.site'},{id:2,name:'ИП Тестовый (Россия)',country:'RU',tax:'770000000000',reg:'320770000000000',addr:'Москва',email:'ru@obiteli.site'}],
+ docs:{offer:{on:true,title:'Оферта',text:'Тестовый текст оферты о добровольной поддержке проекта. Платёж добровольный, без встречного предоставления, возврату не подлежит.'},privacy:{on:true,title:'Политика персональных данных',text:'Тестовый текст политики обработки персональных данных.'},cookies:{on:true,title:'Cookies',text:'Сайт использует файлы cookie для корректной работы.'}},
+ cookieNotice:true,
+ footer:{email:'info@obiteli.site',phone:'+995 555 00 00 00'},
+ catalog:{qr:['qr','QR-код','all'],requisites:['requisites','Реквизиты для перевода','all'],sbp:['link','Оплатить через СБП','RU'],sberpay:['link','SberPay','RU'],tpay:['link','T-Pay','RU'],yookassa:['link','Банковской картой','RU'],robokassa:['link','Картой через Робокассу','RU'],cloudpayments:['link','Картой через CloudPayments','RU'],flitt:['link','Оплатить картой (Flitt)','GE'],bog:['link','Bank of Georgia','GE'],tbc:['link','TBC Bank','GE'],quickpay:['link','Оплатить онлайн','GE'],keepz:['link','Keepz','GE'],custom:['link','Своя ссылка','all']},
+ sections:[]
+};
+const mk=(slug,title,sub,hue,ex={})=>Object.assign({slug,title,sub,hue,
+ intro:'Тестовое описание обители: история основания, главные святыни, уклад монастырской жизни. Текст задаётся в админке в предисловии страницы.',
+ cards:[{title:'Главный храм',sub:'Святыня',text:'Тестовый текст карточки святыни. Дни памяти и даты пишутся здесь же.',place:'От центра города 15 минут на машине.',ll:'41.8,44.7'},
+        {title:'Чудотворная икона',sub:'Святыня',text:'Тестовый текст о чудотворной иконе обители.',place:'В главном храме, справа от алтаря.',ll:''},
+        {title:'Святой источник',sub:'Место',text:'Тестовый текст о святом источнике.',place:'Тропа от ворот монастыря, 300 м.',ll:'41.81,44.71'}],
+ services:[{title:'Онлайн-молебен',text:'Братия совершит молебен о здравии. Имена передаются после оплаты.',price:30,note:'за молебен',button:'Заказать',url:'https://example.com/m',recipient:title,on:true},
+           {title:'Онлайн-экскурсия',text:'Экскурсию по обители проводит монах. Прямой эфир, 40 минут.',price:50,note:'за участника',button:'Заказать',url:'https://example.com/e',recipient:title,on:true}],
+ donate:{on:true,title:'Пожертвование монастырю',text:'Деньги поступают напрямую на счёт обители.',button:'Пожертвовать',recipient:'Монастырь «'+title+'»',
+  methods:[{p:'qr',on:true},{p:'flitt',on:true,url:'https://example.com/d'},{p:'bog',on:true,url:'https://example.com/b'},{p:'requisites',on:true,req:{recipient:'Монастырь «'+title+'»',code:'000000000',bank:'TBC Bank',iban:'GE00TB0000000000000000',swift:'TBCBGE22',purpose:'Пожертвование'}}]}},ex);
+DATA.sections=[
+ {slug:'gruziya',title:'Грузия',currency:'GEL',sym:'₾',fmt:'GE',owner:1,on:true,
+  support:{on:true,title:'Поддержать проект',text:'Сайт существует благодаря добровольной поддержке читателей.',button:'Поддержать',recipient:'ИП Тестовый (Грузия)',methods:[{p:'quickpay',on:true,url:'https://example.com/s'},{p:'qr',on:true}]},
+  tiles:[mk('alaverdi','Алаверди','Кахетия',205),mk('gremi','Греми','Кахетия',195),mk('nekresi','Некреси','Кахетия',215),mk('dzhvari','Джвари','Мцхета',200),mk('gelati','Гелати','Имеретия',190),mk('shio-mgvime','Шио-Мгвиме','Мцхета',210)]},
+ {slug:'serbiya',title:'Сербия',currency:'EUR',sym:'€',fmt:'other',owner:1,on:true,support:{on:false,title:'Поддержать проект',text:'',button:'Поддержать',recipient:'',methods:[]},
+  tiles:[mk('studenica','Студеница','Рашка',140),mk('zica','Жича','Кралево',150),mk('decani','Високи Дечани','Метохия',160)]},
+ {slug:'greciya',title:'Греция',currency:'EUR',sym:'€',fmt:'other',owner:1,on:true,support:{on:false,title:'',text:'',button:'',recipient:'',methods:[]},
+  tiles:[mk('meteora','Метеоры','Фессалия',30),mk('osios-loukas','Осиос Лукас','Беотия',40)]},
+];
+DATA.sections.forEach(s=>s.tiles.forEach(t=>{t.services.forEach(v=>v.recipient='Монастырь «'+t.title+'»');t.donate.methods.forEach(m=>{if(s.fmt!=='GE'&&m.p!=='qr'&&m.p!=='requisites'){m.p='custom';m.label='Оплатить картой'}});if(s.fmt!=='GE')t.donate.methods.find(m=>m.req).req={recipient:'Монастырь «'+t.title+'»',bank:'Bank',iban:'RS00000000000000000000',swift:'BANKXX',purpose:'Пожертвование'};}));
+DATA.sections[2].tiles[1].services=[];
+DATA.sections.forEach(s=>{s.maps=s.maps||'google';s.tiles.forEach(t=>{const b=COORD[t.slug];if(!b)return;const [la,lo]=b.split(',').map(Number);t.cards[0].ll=b;t.cards.forEach(c=>{if(!c._long){c._long=1;c.text+=' Текст карточки может быть длинным — до 1500 знаков: история, предания, святыни, жизнь обители сегодня. Прокрутите карточку: полоса «‹ К списку» остаётся наверху, а справа в ней появляется название места.'.repeat(1)+' '+'Здесь продолжается рассказ о святыне. '.repeat(14)}});t.cards[1].ll='';t.cards[2].ll=(la+0.003).toFixed(4)+','+(lo+0.004).toFixed(4)})});
+DATA.mode='sections';
+DATA.sections[0].lead='Монастыри Грузии: история, святыни, вина обителей, онлайн-молебны и экскурсии. Нажмите на обитель.';
+const WINES={alaverdi:[{name:'Alaverdi Red',color:'красное',sweet:'полусухое',grape:'Саперави',year:2015,price:45,photo:true,desc:'Тестовое описание вина: виноградник обители, выдержка в квеври, вкус и с чем подавать. Поля карточки — по проекту Вадима.'},{name:'Alaverdi',color:'красное',sweet:'сухое',grape:'Саперави',year:2017,price:60,desc:''},{name:'Alaverdi White',color:'белое',sweet:'сухое',grape:'Ркацители',year:2016,price:50,photo:true,desc:'Тестовое описание белого вина обители.'}],
+ gelati:[{name:'Gelati Tsolikouri',color:'белое',sweet:'сухое',grape:'Цоликоури',year:2021,price:35,photo:true,desc:''},{name:'Gelati Amber',color:'янтарное',sweet:'сухое',grape:'Цицка',year:2020,price:40,desc:'Тестовое описание янтарного вина.'}]};
+DATA.sections.forEach(s=>{s.prices=true;s.tiles.forEach(t=>{t.open='page';t.text=t.intro;t.place='От ближайшего города около 20 минут на машине, парковка у ворот обители.';t.ll=COORD[t.slug]||'';t.wines=WINES[t.slug]||[]})});
+(()=>{const G=DATA.sections[0],by=sl=>G.tiles.find(t=>t.slug===sl);
+ const gr=by('gremi');gr.cards=[];gr.services=[];gr.wines=[];gr.donate.on=false;gr.text='Статичная страница монастыря: только описание и «Как добраться». Плиток, вин и услуг на этой странице нет — так тоже можно.\nТекст до 3000 знаков.';
+ ['nekresi','dzhvari'].forEach(sl=>{const t=by(sl);t.open='card';t.text='Этот монастырь открывается поп-апом, без отдельной страницы: фото, описание до 3000 знаков и «Как добраться» с мини-картой. Так удобно, когда кроме описания ничего нет.\n'+'Здесь продолжается рассказ об обители. '.repeat(10)});
+ const ge=by('gelati');ge.cards=[];ge.services=[];
+})();
+
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function phSVG(h,seed){const v=(seed*37)%60;return `<svg viewBox="0 0 300 200" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g${seed}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="hsl(${h},55%,62%)"/><stop offset=".62" stop-color="hsl(${h},35%,82%)"/></linearGradient></defs><rect width="300" height="200" fill="url(#g${seed})"/><path d="M0 150 Q60 ${120+v/3} 120 140 T300 ${130+v/4} V200 H0Z" fill="hsl(${(h+120)%360},22%,42%)"/><path d="M0 170 Q90 150 170 168 T300 160 V200H0Z" fill="hsl(${(h+110)%360},25%,33%)"/><g fill="hsl(30,25%,${70-v/6}%)" stroke="hsl(30,20%,38%)" stroke-width="1"><rect x="${110+v/2}" y="105" width="70" height="55"/><rect x="${130+v/2}" y="78" width="30" height="30"/><path d="M${126+v/2} 80 L${145+v/2} 48 L${164+v/2} 80Z" fill="hsl(${h},20%,45%)"/><rect x="${90+v/2}" y="120" width="22" height="40"/></g><line x1="${145+v/2}" y1="38" x2="${145+v/2}" y2="50" stroke="#3a2a22" stroke-width="2"/><line x1="${140+v/2}" y1="42" x2="${150+v/2}" y2="42" stroke="#3a2a22" stroke-width="2"/></svg>`}
+function hash(s){let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))%997;return h}
+function curDomain(st){return DATA.domains.find(d=>d.host===st.host)||DATA.domains[0]}
+function visSections(st){const d=curDomain(st);const v=DATA.sections.filter(s=>s.on);if(DATA.mode==='simple')return v.slice(0,1);return d.mode==='all'?v:v.filter(s=>s.slug===d.mode)}
+function owner(id){return DATA.owners.find(o=>o.id==id)}
+function payMethodsHTML(pay,sec,elid){
+ const ms=pay.methods.filter(m=>m.on);const qr=ms.find(m=>m.p==='qr'),rq=ms.find(m=>m.p==='requisites');
+ const links=ms.filter(m=>DATA.catalog[m.p]&&DATA.catalog[m.p][0]==='link');
+ const L={recipient:'Получатель',code:'Код',inn:'ИНН',bank:'Банк',bik:'БИК',account:'Счёт',iban:'IBAN',swift:'SWIFT',purpose:'Назначение'};
+ return `${qr?`<div class="s-qr">${qrSVG(hash(pay.recipient||'x'))}</div><div class="s-note" style="margin-top:0">Наведите камеру телефона на код</div>`:''}
+ ${links.map((m,i)=>`<button class="s-btn ${i?'ghost':''}" data-act="paylink" data-label="${esc(m.label||DATA.catalog[m.p][1])}">${esc(m.label||DATA.catalog[m.p][1])}</button>`).join('')}
+ ${rq?`<details class="s-req"><summary>Реквизиты для перевода</summary><dl>${Object.entries(rq.req).filter(([k,v])=>v).map(([k,v])=>`<dt>${L[k]||k}</dt><dd>${esc(v)}</dd>`).join('')}</dl><button class="s-btn ghost" data-act="copy">Скопировать реквизиты</button></details>`:''}
+ ${DATA.docs.offer.on?`<div class="s-note">Нажимая кнопку, вы соглашаетесь с <a data-act="doc" data-doc="offer">офертой</a></div>`:''}`}
+function qrSVG(seed){let s=seed+7,r=()=>{s=(s*9301+49297)%233280;return s/233280},o='';const fp=(x,y)=>`<rect x="${x}" y="${y}" width="7" height="7"/><rect x="${x+1}" y="${y+1}" width="5" height="5" fill="#fff"/><rect x="${x+2}" y="${y+2}" width="3" height="3"/>`;for(let y=0;y<25;y++)for(let x=0;x<25;x++){if((x<8&&y<8)||(x>16&&y<8)||(x<8&&y>16))continue;if(r()>.5)o+=`<rect x="${x}" y="${y}" width="1" height="1"/>`}return `<svg viewBox="0 0 25 25" style="width:100%;height:100%" fill="#1b1b1b">${fp(0,0)}${fp(18,0)}${fp(0,18)}${o}</svg>`}
+function plural(n,a,b,c){const m=n%10,h=n%100;return n+' '+(m===1&&h!==11?a:m>=2&&m<=4&&(h<10||h>=20)?b:c)}
+function showTabs(st){return DATA.mode==='sections'&&curDomain(st).mode==='all'}
+function tileSub(t,isCard){if(isCard||t.open==='card')return t.sub;if(t.wines&&t.wines.length)return plural(t.wines.length,'вино','вина','вин')+' в каталоге';if(t.services&&t.services.length)return plural(t.services.length,'услуга','услуги','услуг')+' онлайн';return t.sub}
+function tileHTML(t,sec,showTag,elid,isCard){
+ const act=isCard?'card':(t.open==='card'?'tcard':'open');
+ const rich=isCard||(t.wines&&t.wines.length)||(t.services&&t.services.length);
+ return `<div class="s-tile ${rich?'':'alt'}" data-el="${elid}" data-act="${act}" data-slug="${t.slug||''}" data-i="${t._i??''}">
+  <div class="ph">${phSVG(t.hue||sec.tiles[0].hue,hash(t.title))}${showTag?`<span class="tag">${esc(sec.title)}</span>`:''}</div>
+  <div class="bar"><div><h3>${esc(t.title)}</h3><small>${esc(tileSub(t,isCard))}</small></div><span class="arr">⟶</span></div></div>`}
+function paras(t){return String(t||'').split('\n').filter(Boolean).map(p=>`<p>${esc(p)}</p>`).join('')}
+function routeHTML(c,sec){if(!(c.place||c.ll))return '';const mp=MAPS[sec.maps||'google'];return `<div class="s-route"><div class="lb">Как добраться</div>${c.place?`<p>${esc(c.place)}</p>`:''}${c.ll?`<div class="s-mapc" data-ll="${c.ll}" data-t="${esc(c.title)}"></div><div class="s-maphint">На телефоне карту двигают двумя пальцами, одним — прокручивается страница</div><div class="btns"><button class="s-btn" data-act="route">Проложить маршрут</button><button class="s-btn ghost" data-act="mapopen">Открыть в ${mp}</button></div>`:''}</div>`}
+function bottleSVG(w){const p='M53 12h14v32q15 9 15 27v63q0 6-6 6H44q-6 0-6-6V71q0-18 15-27z';
+ if(w.photo){const c={'белое':'#C8B25E','янтарное':'#B06E22','розовое':'#C77C7C'}[w.color]||'#2B0F14';return `<svg viewBox="0 0 120 150"><path d="${p}" fill="${c}"/><rect x="53" y="8" width="14" height="10" fill="#3A1A20"/><rect x="42" y="88" width="36" height="34" fill="#F4EEE4"/><rect x="47" y="96" width="26" height="3" fill="#8B2E2E"/><rect x="47" y="104" width="26" height="2" fill="#B8A893"/><rect x="47" y="109" width="18" height="2" fill="#B8A893"/></svg>`}
+ return `<svg viewBox="0 0 120 150"><path d="${p}" fill="#CDB8A3" stroke="#A88E78" stroke-width="2"/></svg>`}
+function wineHTML(w,i,sec,tile,elid){const pr=sec.prices!==false&&w.price!==''&&w.price!=null;
+ return `<div class="s-wine ${w.desc?'clk':''}" data-el="${elid}" ${w.desc?`data-act="wine" data-i="${i}"`:''}><div class="wph">${bottleSVG(w)}</div><div class="wb"><h4>${esc(w.name)}</h4><div class="wm">${esc(sec.title)}</div><div class="wm">Монастырь ${esc(tile.title)}</div><div class="wt">${esc([w.sweet,w.color].filter(Boolean).join(', '))}</div>${w.grape?`<div class="wg">${esc(w.grape)}</div>`:''}${w.year?`<div class="wg">${esc(w.year)}</div>`:''}${pr?`<div class="wp">${esc(w.price)} ${sec.sym}</div>`:''}</div></div>`}
+function siteTitle(st,sec){const dom=curDomain(st);if(DATA.mode==='simple'){const d=DATA.domains.find(x=>x.mode===sec.slug);return d?d.title:dom.title}return dom.title}
+function renderSite(st,opts={}){
+ const secs=visSections(st),multi=showTabs(st);
+ let sec=secs.find(s=>s.slug===st.section)||secs[0];st.section=sec.slug;
+ const tile=st.page?sec.tiles.find(t=>t.slug===st.page):null;
+ const own=owner(sec.owner),title=siteTitle(st,sec);
+ let h=`<header class="s-head" data-el="header">${tile||st.doc?`<span class="back" data-act="home">← Назад</span>`:''}<span class="ttl" data-act="home">${esc(title)}</span>${!tile&&!st.doc?`<button class="burger" data-act="burger">☰</button>`:''}</header>`;
+ if(st.menu&&!tile)h+=`<nav class="s-menu">${sec.tiles.map(t=>`<a data-act="${t.open==='card'?'tcard':'open'}" data-slug="${t.slug}">${esc(t.title)}</a>`).join('')}</nav>`;
+ h+=`<main class="s-wrap">`;
+ if(st.doc){const d=DATA.docs[st.doc];h+=`<article class="s-doc"><h1>${esc(d.title)}</h1><p>${esc(d.text)}</p></article>`}
+ else if(!tile){
+  h+=`<section class="s-hub" data-el="hub"><div class="s-eyebrow">${esc(DATA.hub.eyebrow)}</div><h1>${esc(multi?DATA.hub.title:title)}</h1><p class="s-lead">${esc(multi?DATA.hub.lead:(sec.lead||DATA.hub.lead))}</p></section>`;
+  if(multi)h+=`<nav class="s-tabs" data-el="tabs">${secs.map(s=>`<button class="s-tab ${s===sec?'on':''}" data-act="tab" data-sec="${s.slug}">${esc(s.title)}<b>${s.tiles.length}</b></button>`).join('')}</nav>`;
+  h+=`<div class="s-grid">${sec.tiles.map(t=>tileHTML(t,sec,multi,`t:${sec.slug}/${t.slug}`)).join('')}</div>`;
+  const pts=sec.tiles.filter(t=>t.ll).length;
+  h+=`<div class="s-map" data-el="map:${sec.slug}">Карта раздела «${esc(sec.title)}»: ${pts} отметок — монастыри с координатами (и открывающиеся страницей, и поп-апом)<br>(Leaflet + кластеризация — у Вадима)</div>`;
+  if(sec.support.on&&sec.support.methods.some(m=>m.on))h+=`<section class="s-pay" data-el="pay:${sec.slug}"><div><h3>${esc(sec.support.title)}</h3><p>${esc(sec.support.text)}</p></div><button class="s-btn" data-act="pay" data-pay="support">${esc(sec.support.button)}</button></section>`;
+ } else {
+  h+=`<section class="s-phead" data-el="t:${sec.slug}/${tile.slug}"><div class="s-ptop"><div class="ph">${phSVG(tile.hue,hash(tile.title+'p'))}</div><div><div class="s-eyebrow">${esc(sec.title)} · ${esc(tile.sub)}</div><h1>${esc(tile.title)}</h1>${tile.text?`<div class="s-ptext">${paras(tile.text)}</div>`:''}</div></div>${routeHTML(tile,sec)}</section>`;
+  if(tile.cards.length)h+=`<div class="s-sec-h">Святыни</div><div class="s-grid s-cards">${tile.cards.map((c,i)=>{c._i=i;return tileHTML(c,sec,false,`c:${sec.slug}/${tile.slug}/${i}`,true)}).join('')}</div>`;
+  if(tile.wines&&tile.wines.length)h+=`<div class="s-sec-h">Вина · ${tile.wines.length}</div><div class="s-wines">${tile.wines.map((w,i)=>wineHTML(w,i,sec,tile,`w:${sec.slug}/${tile.slug}/${i}`)).join('')}</div>`;
+  const sv=tile.services.filter(v=>v.on&&v.url);
+  if(sv.length)h+=`<div class="s-sec-h">Услуги онлайн</div><div class="s-svcs">${sv.map(v=>`<div class="s-svc" data-el="svc:${sec.slug}/${tile.slug}/${tile.services.indexOf(v)}"><h3>${esc(v.title)}</h3><p>${esc(v.text)}</p><div class="s-price">${v.price!==''&&v.price!=null?esc(v.price)+' '+sec.sym:'По договорённости'}<span>${esc(v.note)}</span></div><button class="s-btn" data-act="svc" data-i="${tile.services.indexOf(v)}">${esc(v.button)}</button><div class="s-who">Услугу оказывает: ${esc(v.recipient)}</div></div>`).join('')}</div>`;
+  if(tile.donate.on&&tile.donate.methods.some(m=>m.on))h+=`<section class="s-pay" data-el="don:${sec.slug}/${tile.slug}"><div><h3>${esc(tile.donate.title)}</h3><p>${esc(tile.donate.text)}</p></div><button class="s-btn" data-act="pay" data-pay="donate">${esc(tile.donate.button)}</button></section>`;
+  if(!tile.cards.length&&!(tile.wines&&tile.wines.length)&&!sv.length&&!tile.donate.on)h+=`<div style="height:40px"></div>`;
+ }
+ h+=`</main><footer class="s-foot" data-el="footer"><div class="in"><div><b>${esc(title)}</b><div>${esc(DATA.footer.email)} · ${esc(DATA.footer.phone)}</div>${own?`<div class="req">${esc(own.name)} · ${own.country==='RU'?'ИНН':'Код'} ${esc(own.tax)}${own.reg?' · ОГРНИП '+esc(own.reg):''} · ${esc(own.addr)}</div>`:''}</div><div class="docs">${Object.entries(DATA.docs).filter(([k,d])=>d.on).map(([k,d])=>`<a data-act="doc" data-doc="${k}">${esc(d.title)}</a>`).join('')}</div></div></footer>`;
+ if(DATA.cookieNotice&&!st.cookieOk)h+=`<div class="s-cookie"><span>Сайт использует cookies. <a data-act="doc" data-doc="cookies">Подробнее</a></span><button data-act="cookie">Понятно</button></div>`;
+ return h;
+}
+function cardOverlay(c,sec,ph){return `<div class="s-ov" data-act="close"><div class="s-modal s-cardm" data-stop="1"><div class="s-cbar"><button class="bk" data-act="close"><span>‹</span>К списку</button><span class="ct">${esc(c.title)}</span><button class="xx" data-act="close" aria-label="Закрыть">×</button></div>${ph}<div class="in"><h2>${esc(c.title)}</h2>${c.sub?`<div class="sub">${esc(c.sub)}</div>`:''}${paras(c.text)}${routeHTML(c,sec)}${c.noSrc?'':'<div class="s-src">Фото: автор, источник, лицензия</div>'}</div></div></div>`}
+function overlayHTML(st){
+ const secs=visSections(st),sec=secs.find(s=>s.slug===st.section)||secs[0],tile=st.page?sec.tiles.find(t=>t.slug===st.page):null;
+ if(st.card!=null&&tile){const c=tile.cards[st.card];return cardOverlay(c,sec,`<div class="ph">${phSVG(tile.hue,hash(c.title))}</div>`)}
+ if(st.tcard){const t=sec.tiles.find(x=>x.slug===st.tcard);if(t)return cardOverlay(t,sec,`<div class="ph">${phSVG(t.hue,hash(t.title))}</div>`)}
+ if(st.wine!=null&&tile&&tile.wines[st.wine]){const w=tile.wines[st.wine];const pr=sec.prices!==false&&w.price;return cardOverlay({title:w.name,sub:[w.sweet,w.color,w.grape,w.year].filter(Boolean).join(' · '),text:w.desc+(pr?'\nЦена: '+w.price+' '+sec.sym:''),noSrc:!w.photo},sec,`<div class="wph big">${bottleSVG(w)}</div>`)}
+ if(st.pay){const p=st.pay==='donate'?tile.donate:sec.support;return `<div class="s-ov sheet" data-act="close"><div class="s-modal s-paym" data-stop="1"><button class="x" data-act="close">×</button><div class="in"><h2 style="font-size:26px">${esc(p.button)}</h2><div class="sub" style="text-transform:none;letter-spacing:0">${esc(p.recipient)}</div>${payMethodsHTML(p,sec)}</div></div></div>`}
+ return '';
+}
+function curSec(st){const s=visSections(st);return s.find(x=>x.slug===st.section)||s[0]}
+function afterCard(root,mt){const m=root.querySelector('.s-cardm');if(m){m.scrollTop=mt;const ct=m.querySelector('.ct'),h=m.querySelector('h2');if(ct&&h){const f=()=>ct.classList.toggle('show',h.getBoundingClientRect().bottom<m.getBoundingClientRect().top+52);m.addEventListener('scroll',f);f()}}
+ root.querySelectorAll('.s-mapc').forEach(el=>{
+  if(typeof L==='undefined'){el.innerHTML='<div class="fb">Мини-карта Leaflet + OpenStreetMap<br>(для показа нужен интернет)</div>';return}
+  const ll=el.dataset.ll.split(',').map(Number);const map=L.map(el,{scrollWheelZoom:false}).setView(ll,14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© Авторы OpenStreetMap'}).addTo(map);
+  L.circleMarker(ll,{radius:10,color:'#fff',weight:3,fillColor:'#3B1820',fillOpacity:1}).addTo(map).bindTooltip(el.dataset.t,{direction:'top',offset:[0,-10]});
+  map.on('click',()=>map.scrollWheelZoom.enable());setTimeout(()=>map.invalidateSize(),60)})}
+function mountSite(root,st,opts={}){
+ root.classList.add('site');if(opts.preview)root.classList.add('pv');
+ let lastKey='';
+ const draw=()=>{const sc=root.querySelector('.s-scroll');const key=[st.host,st.section,st.page,st.doc].join('|');const top=sc&&key===lastKey?sc.scrollTop:0;lastKey=key;
+  const _m=root.querySelector('.s-cardm');const _mt=_m?_m.scrollTop:0;root.innerHTML=`<div class="s-scroll">${renderSite(st,opts)}</div>${overlayHTML(st)}${st.toast?`<div class="s-toast">${esc(st.toast)}</div>`:''}`;
+  root.querySelector('.s-scroll').scrollTop=top;afterCard(root,_mt);
+  if(opts.getSel&&(opts.selected=opts.getSel()),opts.selected){const e=root.querySelector(`[data-el="${CSS.escape(opts.selected)}"]`);if(e)e.classList.add('sel')}
+  opts.onDraw&&opts.onDraw()};
+ const toast=t=>{st.toast=t;draw();clearTimeout(st._tt);st._tt=setTimeout(()=>{st.toast='';draw()},2200)};
+ root.onclick=e=>{
+  const a=e.target.closest('[data-act]');const elx=e.target.closest('[data-el]');
+  if(e.target.closest('[data-stop]')&&a&&a.dataset.act==='close'&&!e.target.closest('.x,.s-btn,.bk,.xx'))return;
+  if(opts.preview&&elx&&opts.onSelect&&!(a&&['tab','home','close','burger'].includes(a.dataset.act)))opts.onSelect(elx.dataset.el);
+  if(!a)return;const d=a.dataset;
+  switch(d.act){
+   case 'tab':st.section=d.sec;st.tcard=null;st.menu=false;break;
+   case 'open':st.tcard=null;st.wine=null;st.page=d.slug;st.card=null;st.menu=false;break;
+   case 'home':st.tcard=null;st.wine=null;st.page=null;st.doc=null;st.card=null;st.pay=null;break;
+   case 'card':st.card=+d.i;break;
+   case 'close':st.card=null;st.pay=null;st.tcard=null;st.wine=null;break;
+   case 'tcard':st.tcard=d.slug;st.menu=false;break;
+   case 'wine':st.wine=+d.i;break;
+   case 'pay':st.pay=d.pay;break;
+   case 'burger':st.menu=!st.menu;break;
+   case 'doc':st.doc=d.doc;st.pay=null;st.page=null;break;
+   case 'cookie':st.cookieOk=true;break;
+   case 'svc':return toast('Демо: откроется страница оплаты монастыря в новой вкладке');
+   case 'paylink':return toast('Демо: «'+d.label+'» — откроется оплата в новой вкладке');
+   case 'copy':return toast('Скопировано');
+   case 'route':return toast('Демо: маршрут до точки в '+(curSec(st).maps==='yandex'?'Яндекс Картах':'Google Картах')+' (новая вкладка / приложение карт)');
+   case 'mapopen':return toast('Демо: точка откроется в '+MAPS[curSec(st).maps||'google']);
+  }
+  if(opts.onRoute)opts.onRoute();draw();
+ };
+ draw();return {draw};
+}
+
+const A={sec:'gruziya',sel:'t:gruziya/alaverdi',open:{'alaverdi':true},addMenu:null,dirty:false};
+const pst={host:DATA.domains[0].host,section:'gruziya',page:null,card:null,pay:null,doc:null,cookieOk:true};
+const $=s=>document.querySelector(s);
+const S=()=>DATA.sections.find(s=>s.slug===A.sec);
+const TYPES={intro:'Предисловие',tile:'Плитка',card:'Плитка',svc:'Услуга',don:'Оплата',pay:'Оплата',map:'Карта',w:'Вино'};
+function toast(t){const d=document.createElement('div');d.className='toastA';d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2000)}
+function dirty(v=true){A.dirty=v;const s=$('#st');s.textContent=v?'Есть несохранённые изменения':'Все изменения сохранены';s.classList.toggle('dirty',v)}
+function get(id){const [k,p]=id.split(':');const a=(p||'').split('/');const sec=DATA.sections.find(s=>s.slug===a[0]);const t=sec&&a[1]?sec.tiles.find(x=>x.slug===a[1]):null;
+ return {k,sec,t,i:a[2]!=null?+a[2]:null}}
+// ---------- tree ----------
+function row(id,label,type,o={}){const sel=A.sel===id?'sel':'';return `<div class="row ${sel} ${o.hid?'hid':''}" data-id="${id}" ${o.drag?`draggable="true" data-dnd="${o.drag}"`:''}>
+ <span class="h">${o.drag?'⋮⋮':''}</span>${o.tog!=null?`<span class="tg" data-tog="${o.tog}">${A.open[o.tog]?'▾':'▸'}</span>`:`<span class="dot ${o.photo===false?'no':''}" style="${o.photo==null?'visibility:hidden':''}"></span>`}
+ <span class="lb">${esc(label)}</span><span class="ty">${type}</span>${o.del?`<span class="ic" data-hide="${id}" title="Скрыть / показать">${o.hid?'◌':'◉'}</span><span class="ic" data-del="${id}" title="Удалить">✕</span>`:''}</div>`}
+function addMenu(where,hasTypes){if(A.addMenu!==where)return `<div class="addel" data-add="${where}">+ Добавить элемент</div>`;
+ const all=where==='L1'?['Предисловие','Плитка','Карта','Оплата','Вино','Послесловие']:['Предисловие','Плитка','Карта','Оплата','Услуга','Вино','Послесловие'];return `<div class="addel" data-add="">− Скрыть выбор</div><div class="menu">${all.map(x=>{const dis=hasTypes.includes(x);return `<div class="${dis?'dis':''}" data-addtype="${x}" title="${dis?'Уже есть на этом уровне':''}">${x}${x==='Вино'?'<span class="new">1.4</span>':''}${dis?' <span style="font-size:11px">· уже есть</span>':''}</div>`}).join('')}</div>`}
+function drawTree(){const simple=DATA.mode==='simple';if(simple)A.sec=DATA.sections.find(s=>s.on).slug;const sec=S();
+ let h=simple?`<div class="secs"><div class="ttl"><span>Режим: простой сайт <span class="new">1.4</span></span><span class="ic" style="cursor:pointer" data-id="mode">⚙ режим</span></div><div class="hintx">Табов нет. Разделы в админке не показываются.</div></div><div class="tw">`
+ :`<div class="secs"><div class="ttl"><span>Разделы (табы) <span class="new">1.4</span></span><span class="ic" style="cursor:pointer" data-id="sec:${sec.slug}">⚙ раздел</span></div><div class="pills">${DATA.sections.map(s=>`<span class="pill ${s.slug===A.sec?'on':''} ${s.on?'':'off'}" data-sec="${s.slug}">${esc(s.title)} · ${s.tiles.length}</span>`).join('')}<span class="pill add" data-newsec="1">+ Раздел</span></div>
+ <div class="hintx">Режим «С табами»: табы на мировом адресе видны всегда, даже если раздел один</div></div><div class="tw">`;
+ h+=row('header','Шапка','Все страницы');
+ h+=`<div class="grp"><span>Главная · уровень 1${simple?'':' · '+esc(sec.title)}</span></div>`;
+ h+=row('hub',simple?'Предисловие главной':'Общее предисловие','Предисловие');
+ h+=`<div data-list="tiles">`+sec.tiles.map(t=>{const id=`t:${sec.slug}/${t.slug}`;const pg=t.open==='page';const n=t.cards.length+t.services.length+(t.wines||[]).length+(t.donate.on?1:0);
+  let r=row(id,t.title,pg?(n?`Страница · ${n}`:'Страница · статичная'):'Карточка (поп-ап)',pg?{tog:t.slug,drag:'tiles',del:1}:{photo:true,drag:'tiles',del:1});
+  if(pg&&A.open[t.slug]){r+=`<div class="kids">`+t.cards.map((c,i)=>row(`c:${sec.slug}/${t.slug}/${i}`,c.title,'Плитка',{photo:true,del:1})).join('')+(t.wines||[]).map((w,i)=>row(`w:${sec.slug}/${t.slug}/${i}`,w.name,'Вино',{photo:!!w.photo,del:1})).join('')+t.services.map((v,i)=>row(`svc:${sec.slug}/${t.slug}/${i}`,v.title,'Услуга',{del:1,hid:!v.on})).join('')+(t.donate.on?row(`don:${sec.slug}/${t.slug}`,t.donate.title,'Оплата',{del:1}):'')+(n?'':`<div class="hintx" style="padding:4px 8px">Пусто — страница статичная: описание и «Как добраться» из самой плитки</div>`)+addMenu(t.slug,t.donate.on?['Оплата']:[])+`</div>`}
+  return r}).join('')+`</div>`;
+ h+=row(`map:${sec.slug}`,'Карта','Карта',{del:1});
+ h+=row(`pay:${sec.slug}`,sec.support.title||'Поддержать проект','Оплата',{del:1,hid:!sec.support.on});
+ h+=addMenu('L1',['Карта','Оплата']);
+ h+=row('footer','Подвал','Все страницы');
+ h+=`<div class="grp"><span>Настройки сайта</span></div>`+row('mode','Режим сайта',simple?'Простой':'С табами')+(simple?row('sec:'+sec.slug,'Основное','Валюта, карты, цены'):row('dom','Адреса (домены)','Все разделы'))+row('owners','Владельцы','Реквизиты')+row('docs','Документы и cookies','3 страницы');
+ h+=`</div>`;$('#tree').innerHTML=h;}
+// ---------- form helpers ----------
+const F={
+ txt:(lab,path,max,hint)=>{const v=val(path)??'';return `<div class="fld"><label>${lab}${max?`<i class="${String(v).length>max?'over':''}" data-cnt="${path}">${String(v).length} / ${max}</i>`:''}</label><input type="text" data-path="${path}" data-max="${max||''}" value="${esc(v)}">${hint?`<div class="hintx">${hint}</div>`:''}</div>`},
+ area:(lab,path,max,hint)=>{const v=val(path)??'';return `<div class="fld"><label>${lab}${max?`<i class="${String(v).length>max?'over':''}" data-cnt="${path}">${String(v).length} / ${max}</i>`:''}</label><textarea data-path="${path}" data-max="${max||''}">${esc(v)}</textarea>${hint?`<div class="hintx">${hint}</div>`:''}</div>`},
+ num:(lab,path,hint)=>`<div class="fld"><label>${lab}</label><input type="number" data-path="${path}" data-num="1" value="${esc(val(path)??'')}">${hint?`<div class="hintx">${hint}</div>`:''}</div>`,
+ sw:(lab,path)=>`<label class="sw"><input type="checkbox" data-path="${path}" data-bool="1" ${val(path)?'checked':''}> ${lab}</label>`,
+ sel:(lab,path,opts,hint)=>`<div class="fld"><label>${lab}</label><select data-path="${path}">${opts.map(([v,t])=>`<option value="${v}" ${String(val(path))===String(v)?'selected':''}>${t}</option>`).join('')}</select>${hint?`<div class="hintx">${hint}</div>`:''}</div>`,
+ head:(crumb,title,neu)=>`<div class="crumb">${crumb}</div><div class="ftitle">${title}${neu?`<span class="new">${neu}</span>`:''}</div>`,
+ photo:(r)=>`<div class="fld"><label>Фото</label><div class="photo"><div class="th" ${r==='4:5'?'style="width:64px;height:80px;background:#E6D8C3;display:grid;place-items:center"':''}>${r==='4:5'?bottleSVG({photo:true}):phSVG(200,7)}</div><div><button class="btn sm" data-toast="Откроется редактор: рамка ${r||'3:2'}, масштаб, поворот">Изменить кадр</button> <button class="btn sm" data-toast="Выбор файла, затем редактор">Заменить фото</button><div class="hintx">Рамка ${r||'3:2'}${r==='4:5'?', итог 1200×1500: бутылка по центру на ровном фоне':''}, сжатие автоматически</div></div></div></div>`
+};
+function resolve(path){return path.split('.').reduce((o,k)=>o==null?o:o[k],window)}
+function val(path){return resolve(path)}
+function setVal(path,v){const ks=path.split('.');const last=ks.pop();const o=ks.reduce((o,k)=>o[k],window);o[last]=v}
+// expose data path roots
+window.D=DATA;
+function secIdx(s){return DATA.sections.indexOf(s)}
+function payForm(base,pay,sec){
+ const ms=pay.methods;const cat=DATA.catalog;
+ let h=F.txt('Заголовок блока',base+'.title',60)+F.area('Текст блока',base+'.text',300)+F.txt('Текст кнопки',base+'.button',30)+F.txt('Кому идут деньги',base+'.recipient',100,'Видно посетителю в окне оплаты');
+ h+=`<div class="box"><h4>Способы оплаты <span class="new">1.1</span></h4><div class="hintx" style="margin:-4px 0 8px">Порядок здесь = порядок кнопок на сайте. Первая кнопка выделена. Формат реквизитов раздела: <b>${sec.fmt}</b></div><div data-list="pm" data-base="${base}">`;
+ ms.forEach((m,i)=>{const c=cat[m.p];const mb=`${base}.methods.${i}`;h+=`<div class="pm" draggable="true" data-dnd="pm" data-i="${i}"><span class="h">⋮⋮</span><input type="checkbox" data-path="${mb}.on" data-bool="1" ${m.on?'checked':''}><span class="nm2">${esc(m.label||c[1])}</span><span class="ic" data-delpm="${i}" style="cursor:pointer;color:#B9AEA4">✕</span><div class="sub">`+
+  (c[0]==='link'?`<input type="text" placeholder="Ссылка на оплату https://…" data-path="${mb}.url" value="${esc(m.url||'')}"><input type="text" placeholder="Подпись кнопки (пусто — «${esc(c[1])}»)" data-path="${mb}.label" value="${esc(m.label||'')}">`:
+   c[0]==='qr'?`<button class="btn sm" data-toast="Загрузка картинки QR из банка">Заменить картинку QR</button>`:
+   Object.keys(m.req).map(k=>`<input type="text" placeholder="${k}" data-path="${mb}.req.${k}" value="${esc(m.req[k])}">`).join(''))+`</div></div>`});
+ const can=Object.entries(cat).filter(([k,c])=>(c[2]==='all'||c[2]===sec.fmt)&&!((k==='qr'||k==='requisites')&&ms.some(m=>m.p===k)));
+ h+=`</div><select class="btn sm" data-addpm="${base}" style="margin-top:6px"><option value="">+ Способ из справочника…</option>${can.map(([k,c])=>`<option value="${k}">${c[1]}${c[2]!=='all'?' · '+c[2]:''}</option>`).join('')}</select><div class="hintx">Каждый QR-код и ссылку проверьте перед включением: получатель и счёт</div></div>`;
+ return h}
+function drawForm(){const id=A.sel;const g=get(id);let h='';const sec=S(),si=secIdx(sec);
+ const sb=`D.sections.${si}`;
+ if(id==='header')h=F.head('Все страницы','Шапка')+`<label class="sw"><input type="checkbox" checked> Показывать шапку</label>`+F.sel('Меню-бургер','D._burger',[['auto','Авто'],['on','Всегда'],['off','Никогда']],'Авто: появляется, если плиток на главной больше 6')+`<div class="hintx">Название сайта в шапке задаётся для каждого адреса: «Настройки сайта → Адреса» <span class="new">1.2</span></div>`;
+ else if(id==='hub')h=F.head('Главная','Общее предисловие','1.2')+F.txt('Надзаголовок','D.hub.eyebrow',40)+F.txt('Заголовок','D.hub.title',60,'На адресе одного раздела вместо него — название сайта этого адреса')+F.area('Текст','D.hub.lead',800)+`<div class="hintx">Стоит над табами разделов. Общий для всех разделов.</div>`;
+ else if(g.k==='sec')h=(DATA.mode==='simple'?F.head('Настройки сайта','Основное','1.4')+`<div class="hintx" style="margin-bottom:12px">В простом режиме настройки раздела — это настройки сайта</div>`:F.head('Раздел','Раздел «'+esc(sec.title)+'»','1.1')+F.sw('Показывать на сайте',sb+'.on')+F.txt('Подпись таба',sb+'.title',30)+`<div class="fld"><label>Slug</label><input type="text" value="${sec.slug}" disabled><div class="hintx">Создаётся из подписи, после первого сохранения не меняется сам</div></div>`)+F.sel('Валюта',sb+'.currency',[['RUB','RUB ₽'],['GEL','GEL ₾'],['EUR','EUR €'],['USD','USD $']])+F.sel('Формат реквизитов',sb+'.fmt',[['RU','Россия (ИНН, БИК, счёт)'],['GE','Грузия (код, IBAN, SWIFT)'],['other','Другой (IBAN / счёт, SWIFT)']])+F.sel('Сервис карт <span class="new">1.3</span>',sb+'.maps',[['google','Google Карты'],['yandex','Яндекс Карты']],'Кнопки «Проложить маршрут» и «Открыть в картах» в карточках раздела')+F.sw('Показывать цены вин <span class="new">1.4</span>',sb+'.prices')+`<div class="hintx" style="margin:-6px 0 12px">Для российской аудитории — решение юриста (реклама и дистанционная продажа алкоголя)</div>`+F.sel('Владелец раздела',sb+'.owner',DATA.owners.map(o=>[o.id,o.name]),'Реквизиты владельца — в подвале страниц раздела')+`<div class="box"><h4>Перенос раздела <span class="new">1.2</span></h4><button class="btn sm" data-toast="Скачается ZIP: JSON раздела + фото">Выгрузить раздел</button> <button class="btn sm" data-toast="Выбор ZIP — раздел добавится как новый">Загрузить раздел</button><div class="hintx">Для переноса страны в отдельную установку</div></div><button class="btn bad sm" data-toast="Удалить раздел и всё в нём (${sec.tiles.length} плиток)? — подтверждение">Удалить раздел</button>`;
+ else if(g.k==='t'){const ti=sec.tiles.indexOf(g.t),tb=`${sb}.tiles.${ti}`,pg=g.t.open==='page';h=F.head(`Главная${DATA.mode==='simple'?'':' · '+esc(sec.title)}`,esc(g.t.title),'1.4')+`<div class="fld"><label>При нажатии</label><div class="seg"><label><input type="radio" name="om" value="page" data-path="${tb}.open" ${pg?'checked':''}>Открыть страницу</label><label><input type="radio" name="om" value="card" data-path="${tb}.open" ${pg?'':'checked'}>Открыть карточку (поп-ап)</label></div><div class="hintx">${pg?'Страница: верх — описание из этой плитки; ниже — элементы страницы, если добавлены. Без элементов — статичная страница.':'Поп-ап: только описание и «Как добраться». Элементы страницы, если были, сохраняются и вернутся при выборе «Открыть страницу».'}</div></div>`+F.photo()+F.txt('Название',tb+'.title',45)+F.txt('Подпись',tb+'.sub',90,'Видна под фото всегда')+F.area('Текст',tb+'.text',3000,pg?'Описание наверху страницы':'Виден в карточке')+F.txt('Как добраться',tb+'.place',140,'Текстом, без координат')+F.txt('Широта, долгота',tb+'.ll',0,'Точка на мини-карте и на карте главной')+F.txt('Источник фото','D._src',120,'Автор, сайт, лицензия')+(pg?`<button class="btn sm" data-goto="${g.t.slug}">Перейти на страницу плитки →</button>`:`<button class="btn sm" data-tcard="${g.t.slug}">Показать поп-ап в превью</button>`)}
+ else if(g.k==='w'){const ti=sec.tiles.indexOf(g.t),wb=`${sb}.tiles.${ti}.wines.${g.i}`;h=F.head(`Главная / ${esc(g.t.title)}`,'Вино','1.4')+`<div class="box" style="background:#FBF6EE"><b>Поля — по карточке вина в проекте Вадима.</b><div class="hintx">Здесь пример набора. Страна и монастырь подставляются сами из раздела и страницы.</div></div>`+F.photo('4:5')+F.txt('Название',wb+'.name',60)+F.sel('Цвет',wb+'.color',[['красное','красное'],['белое','белое'],['розовое','розовое'],['янтарное','янтарное']])+F.sel('Сладость',wb+'.sweet',[['сухое','сухое'],['полусухое','полусухое'],['полусладкое','полусладкое'],['сладкое','сладкое']])+F.txt('Сорт винограда',wb+'.grape',60)+F.num('Год урожая',wb+'.year')+F.num(`Цена, ${sec.sym}`,wb+'.price',sec.prices?'Пусто — цена не показывается':'Цены вин в разделе выключены')+F.area('Описание',wb+'.desc',3000,'Если заполнено — карточка открывает поп-ап. Кнопки «Купить» нет')+`<button class="btn sm" data-goto="${g.t.slug}">Показать на странице →</button>`}
+ else if(id==='mode'){const many=DATA.sections.filter(s=>s.on).length;h=F.head('Настройки сайта','Режим сайта','1.4')+`<div class="fld"><div class="seg" style="flex-direction:column;align-items:flex-start"><label><input type="radio" name="md" value="simple" data-path="D.mode" ${DATA.mode==='simple'?'checked':''}>Простой — одна лента плиток, табов нет</label><label><input type="radio" name="md" value="sections" data-path="D.mode" ${DATA.mode==='sections'?'checked':''}>С табами — разделы (например, страны) над лентой</label></div></div><div class="box"><div class="hintx">• Выбирается при создании сайта.<br>• Простой → С табами: в любой момент, текущие плитки станут первым табом.<br>• С табами → Простой: только когда остался один раздел${many>1?` (сейчас ${many}; в макете для показа остальные скрываются)`:''}.<br>• В режиме «С табами» табы видны сразу, даже если раздел один.</div></div>`}
+ else if(g.k==='intro'){const ti=sec.tiles.indexOf(g.t);h=F.head(`Главная / ${esc(g.t.title)}`,'Предисловие')+F.area('Текст',`${sb}.tiles.${ti}.intro`,800)}
+ else if(g.k==='c'){const ti=sec.tiles.indexOf(g.t),cb=`${sb}.tiles.${ti}.cards.${g.i}`;h=F.head(`Главная / ${esc(g.t.title)}`,'Плитка · карточка')+F.photo()+F.txt('Название',cb+'.title',45)+F.txt('Подпись',cb+'.sub',90)+F.area('Текст',cb+'.text',1500,'Виден в карточке. Дни памяти и даты пишутся здесь же')+F.txt('Как добраться',cb+'.place',140)+F.txt('Широта, долгота',cb+'.ll',0,'Точка сама появится на карте')+`<button class="btn sm" data-card="${g.i}" data-goto="${g.t.slug}">Показать карточку в превью</button>`}
+ else if(g.k==='svc'){const ti=sec.tiles.indexOf(g.t),vb=`${sb}.tiles.${ti}.services.${g.i}`;h=F.head(`Главная / ${esc(g.t.title)}`,'Услуга','1.1')+F.sw('Показывать на сайте',vb+'.on')+F.txt('Заголовок',vb+'.title',60)+F.area('Текст',vb+'.text',500)+F.num(`Цена, ${sec.sym}`,vb+'.price','Пусто — «по договорённости». Валюта — из раздела')+F.txt('Подпись к цене',vb+'.note',40)+F.txt('Текст кнопки',vb+'.button',30)+F.txt('Ссылка на оплату',vb+'.url',0,'Ссылку берите из платёжного сервиса монастыря. Без ссылки услуга не показывается')+F.txt('Кому идут деньги',vb+'.recipient',100,'На сайте: «Услугу оказывает: …»')}
+ else if(g.k==='don'){const ti=sec.tiles.indexOf(g.t);h=F.head(`Главная / ${esc(g.t.title)}`,'Оплата · пожертвование монастырю')+F.sw('Показывать на сайте',`${sb}.tiles.${ti}.donate.on`)+payForm(`D.sections.${si}.tiles.${ti}.donate`,g.t.donate,sec)}
+ else if(g.k==='pay')h=F.head(`Главная · ${esc(sec.title)}`,'Оплата · поддержать проект')+F.sw('Показывать на сайте',`${sb}.support.on`)+`<div class="hintx" style="margin-bottom:12px">Деньги получает владелец раздела. Одна Оплата на уровень</div>`+payForm(`${sb}.support`,sec.support,sec);
+ else if(g.k==='map')h=F.head(`Главная · ${esc(sec.title)}`,'Карта')+F.txt('Заголовок карты','D._maptitle',60)+`<div class="hintx">Отметки ставятся сами — из координат плиток раздела. Сейчас отметок: ${sec.tiles.length}</div>`;
+ else if(id==='footer')h=F.head('Все страницы','Подвал')+`<label class="sw"><input type="checkbox" checked> Показывать подвал</label>`+F.txt('Почта','D.footer.email')+F.txt('Телефон','D.footer.phone')+`<div class="hintx">Реквизиты владельца и ссылки на документы выводятся автоматически <span class="new">1.1</span>. Соцсети — 12 строк, как в макете v5.</div>`;
+ else if(id==='dom'){h=F.head('Настройки сайта','Адреса (домены)','1.2')+`<div class="hintx" style="margin-bottom:12px">Адрес показывает все разделы с табами или один раздел без табов. Контент общий: правка видна на всех адресах.</div>`+DATA.domains.map((d,i)=>`<div class="box">${F.txt('Адрес',`D.domains.${i}.host`)}${F.sel('Показывает',`D.domains.${i}.mode`,[['all','Все разделы (табы)'],...DATA.sections.map(s=>[s.slug,'Только раздел «'+s.title+'»'])])}${F.txt('Название сайта на этом адресе',`D.domains.${i}.title`,40)}</div>`).join('')+`<button class="btn sm" data-adddom="1">+ Адрес</button><div class="hintx" style="margin-top:8px">Если у раздела есть свой адрес, canonical страниц раздела указывает на него</div>`}
+ else if(id==='owners')h=F.head('Настройки сайта','Владельцы','1.1')+DATA.owners.map((o,i)=>`<div class="box">${F.txt('Название',`D.owners.${i}.name`,120)}${F.sel('Страна',`D.owners.${i}.country`,[['RU','Россия'],['GE','Грузия'],['other','Другая']])}${F.txt(o.country==='RU'?'ИНН':'Идентификационный код',`D.owners.${i}.tax`)}${o.country==='RU'?F.txt('ОГРНИП / ОГРН',`D.owners.${i}.reg`):''}${F.txt('Адрес',`D.owners.${i}.addr`)}</div>`).join('')+`<button class="btn sm" data-toast="Добавлен владелец">+ Владелец</button><div class="hintx">Реквизиты владельца раздела выводятся в подвале. Их требуют платёжные сервисы</div>`;
+ else if(id==='docs')h=F.head('Настройки сайта','Документы и cookies','1.1')+Object.keys(DATA.docs).map(k=>`<div class="box">${F.sw('Показывать на сайте',`D.docs.${k}.on`)}${F.txt('Заголовок',`D.docs.${k}.title`,60)}${F.area('Текст',`D.docs.${k}.text`,20000)}</div>`).join('')+F.sw('Уведомление о cookies','D.cookieNotice')+`<div class="hintx">Тексты документов согласуйте с юристом</div>`;
+ if(g.k&&['t','c','w','svc','don','map','pay'].includes(g.k))h+=`<div style="margin-top:22px"><button class="btn bad sm" data-toast="Удалить элемент? — подтверждение">Удалить элемент</button></div>`;
+ $('#form').innerHTML=`<div class="in">${h}</div>`;}
+// ---------- preview ----------
+let PW=1280;
+function routeFor(id){const g=get(id);if(g.sec){pst.section=g.sec.slug;A.sec=g.sec.slug}
+ if(['intro','c','svc','don','w'].includes(g.k)){pst.page=g.t.slug;pst.doc=null}else if(g.k==='t'&&g.t&&g.t.open==='page'&&false){}else if(['t','map','pay','sec','hub'].includes(g.k)){pst.page=null;pst.doc=null}
+ pst.card=null;pst.pay=null;pst.tcard=null;pst.wine=null;
+ const d=DATA.domains.find(x=>x.host===pst.host);if(d.mode!=='all'&&g.sec&&d.mode!==g.sec.slug){pst.host=DATA.domains.find(x=>x.mode==='all').host;$('#pvdom').value=pst.host}}
+const pv=mountSite($('#pv'),pst,{preview:true,getSel:()=>A.sel,onSelect:id=>{if(id==='tabs')id='sec:'+pst.section;A.sel=id;if(get(id).t)A.open[get(id).t.slug]=true;drawTree();drawForm()},onRoute:()=>{if(pst.section!==A.sec){A.sec=pst.section;drawTree()}}});
+function fit(){const st=$('#pvst'),f=$('#frm');const H=Math.max(st.clientHeight-28,400);f.style.width=PW+'px';const sc=Math.min(1,(st.clientWidth-28)/PW);f.style.height=(H/sc)+'px';f.style.transform=`scale(${sc})`}
+function all(){drawTree();drawForm();pv.draw();$('#nm').textContent=DATA.domains[0].title}
+// ---------- events ----------
+$('#tree').addEventListener('click',e=>{const t=e.target;
+ if(t.dataset.tog){A.open[t.dataset.tog]=!A.open[t.dataset.tog];return drawTree()}
+ if(t.dataset.hide){const g=get(t.dataset.hide);if(g.k==='svc')g.t.services[g.i].on=!g.t.services[g.i].on;else if(g.k==='don')g.t.donate.on=!g.t.donate.on;else if(g.k==='pay')g.sec.support.on=!g.sec.support.on;else toast('Скрыто — посетители не видят, данные сохраняются');dirty();return all()}
+ if(t.dataset.del){return toast('Удалить «'+(t.closest('.row').querySelector('.lb').textContent)+'»? — подтверждение')}
+ if(t.dataset.sec){A.sec=t.dataset.sec;pst.section=A.sec;pst.page=null;A.sel='sec:'+A.sec;routeFor(A.sel);return all()}
+ if(t.dataset.newsec){const n=DATA.sections.length+1;DATA.sections.push({slug:'razdel-'+n,title:'Новый раздел',currency:'EUR',sym:'€',fmt:'other',owner:1,on:false,support:{on:false,title:'Поддержать проект',text:'',button:'Поддержать',recipient:'',methods:[]},tiles:[mk('pervaya-plitka','Первая плитка','',100)]});A.sec='razdel-'+n;A.sel='sec:'+A.sec;dirty();toast('Раздел создан скрытым — включите «Показывать на сайте»');return all()}
+ if(t.dataset.add!=null){A.addMenu=t.dataset.add||null;return drawTree()}
+ if(t.dataset.addtype){if(t.classList.contains('dis'))return;const typ=t.dataset.addtype;if(typ==='Вино'&&A.addMenu!=='L1'){const tl=S().tiles.find(x=>x.slug===A.addMenu);tl.wines.push({name:'Новое вино',color:'красное',sweet:'сухое',grape:'',year:'',price:'',desc:''});A.sel=`w:${A.sec}/${tl.slug}/${tl.wines.length-1}`;toast('Вино добавлено: загрузите фото 4:5')}else if(typ==='Услуга'&&A.addMenu!=='L1'){const tl=S().tiles.find(x=>x.slug===A.addMenu);tl.services.push({title:'Новая услуга',text:'',price:'',note:'',button:'Заказать',url:'',recipient:'Монастырь «'+tl.title+'»',on:true});A.sel=`svc:${A.sec}/${tl.slug}/${tl.services.length-1}`;toast('Без ссылки на оплату услуга на сайте не показывается')}else toast('Добавлен элемент «'+typ+'»');A.addMenu=null;dirty();routeFor(A.sel);return all()}
+ const r=t.closest('.row,[data-id]');if(r&&r.dataset.id){A.sel=r.dataset.id;routeFor(A.sel);all()}});
+$('#form').addEventListener('input',e=>{const t=e.target;if(!t.dataset.path)return;let v=t.dataset.bool?t.checked:t.dataset.num?(t.value===''?'':+t.value):t.value;setVal(t.dataset.path,v);
+ if(t.dataset.path.endsWith('.currency')){const s=S();s.sym={RUB:'₽',GEL:'₾',EUR:'€',USD:'$'}[v]}
+ const c=document.querySelector(`[data-cnt="${CSS.escape(t.dataset.path)}"]`);if(c){c.textContent=String(v).length+' / '+t.dataset.max;c.classList.toggle('over',String(v).length>+t.dataset.max)}
+ dirty();clearTimeout(A._t);A._t=setTimeout(()=>{drawTree();pv.draw();if(t.tagName==='SELECT'||t.type==='checkbox'||t.type==='radio')drawForm()},250)});
+$('#form').addEventListener('change',e=>{const t=e.target;
+ if(t.dataset.addpm){if(!t.value)return;const pay=resolve(t.dataset.addpm);const c=DATA.catalog[t.value];const m={p:t.value,on:true};if(c[0]==='link')m.url='';if(t.value==='requisites'){const f=S().fmt;m.req=f==='RU'?{recipient:'',inn:'',bank:'',bik:'',account:'',purpose:'Пожертвование'}:f==='GE'?{recipient:'',code:'',bank:'',iban:'',swift:'',purpose:'Пожертвование'}:{recipient:'',bank:'',iban:'',swift:'',purpose:'Пожертвование'}}pay.methods.push(m);dirty();drawForm();pv.draw()}});
+$('#form').addEventListener('click',e=>{const t=e.target.closest('[data-toast],[data-goto],[data-delpm],[data-adddom],[data-tcard]');if(!t)return;
+ if(t.dataset.tcard){pst.page=null;pst.tcard=t.dataset.tcard;pv.draw();return}
+ if(t.dataset.goto){pst.page=t.dataset.goto;pst.card=t.dataset.card!=null?+t.dataset.card:null;pv.draw()}
+ if(t.dataset.toast&&!t.dataset.goto)toast(t.dataset.toast);
+ if(t.dataset.delpm!=null){const base=t.closest('[data-base]').dataset.base;resolve(base).methods.splice(+t.dataset.delpm,1);dirty();drawForm();pv.draw()}
+ if(t.dataset.adddom){DATA.domains.push({host:'new.obiteli.site',mode:A.sec,title:'Новый сайт'});dirty();drawForm();fillDom()}});
+// drag & drop (tiles in tree, methods in form)
+let drag=null;
+document.addEventListener('dragstart',e=>{const d=e.target.closest('[data-dnd]');if(!d)return;drag=d;e.dataTransfer.effectAllowed='move'});
+document.addEventListener('dragover',e=>{const d=e.target.closest('[data-dnd]');if(drag&&d&&d.dataset.dnd===drag.dataset.dnd){e.preventDefault();d.classList.add('drag-over')}});
+document.addEventListener('dragleave',e=>{const d=e.target.closest('[data-dnd]');d&&d.classList.remove('drag-over')});
+document.addEventListener('drop',e=>{const d=e.target.closest('[data-dnd]');if(!drag||!d)return;e.preventDefault();d.classList.remove('drag-over');
+ if(drag.dataset.dnd==='tiles'){const tl=S().tiles;const a=tl.findIndex(t=>'t:'+A.sec+'/'+t.slug===drag.dataset.id),b=tl.findIndex(t=>'t:'+A.sec+'/'+t.slug===d.dataset.id);tl.splice(b,0,tl.splice(a,1)[0])}
+ if(drag.dataset.dnd==='pm'){const pay=resolve(d.closest('[data-base]').dataset.base);const a=+drag.dataset.i,b=+d.dataset.i;pay.methods.splice(b,0,pay.methods.splice(a,1)[0]);drawForm()}
+ drag=null;dirty();all()});
+$('#save').onclick=()=>{dirty(false);toast('Сохранено — изменения сразу на сайте')};
+$('#open').onclick=()=>toast('Откроется сайт в новой вкладке');
+$('#dv').onclick=e=>{const b=e.target.closest('button');if(!b)return;[...b.parentNode.children].forEach(x=>x.classList.toggle('on',x===b));PW=+b.dataset.w;fit()};
+function fillDom(){$('#pvdom').innerHTML=DATA.domains.map(d=>`<option value="${d.host}">${d.host}</option>`).join('');$('#pvdom').value=pst.host}
+$('#pvdom').onchange=e=>{pst.host=e.target.value;const d=DATA.domains.find(x=>x.host===pst.host);if(d.mode!=='all'){pst.section=d.mode;A.sec=d.mode}pst.page=null;all()};
+addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='s'){e.preventDefault();$('#save').click()}});
+addEventListener('resize',fit);fillDom();routeFor(A.sel);all();fit();
+
+</script></body></html>
