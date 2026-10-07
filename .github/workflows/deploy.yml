@@ -1,0 +1,66 @@
+# Выкладка на reg.ru по FTP после каждого пуша в main.
+# Нужны секреты репозитория: FTP_HOST, FTP_USER, FTP_PASSWORD, FTP_DIR.
+# Пока их нет, выкладка пропускается, а проверка PHP всё равно идёт.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: pdo_sqlite
+      - name: Синтаксис PHP
+        run: find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
+      - name: Сайт отвечает
+        run: |
+          php -S 127.0.0.1:8080 -t public public/index.php >/tmp/php.log 2>&1 &
+          sleep 1
+          curl -fsS http://127.0.0.1:8080/health
+          curl -fsS http://127.0.0.1:8080/ | grep -q '<h1>'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/net-takoy)" = 404
+
+  deploy:
+    needs: check
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Есть ли FTP-секреты
+        id: secrets
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+        run: echo "ready=$([ -n "$FTP_HOST" ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+      - name: Выкладка по FTP
+        if: steps.secrets.outputs.ready == 'yes'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: ${{ secrets.FTP_DIR }}
+          protocol: ${{ vars.FTP_PROTOCOL || 'ftps' }}
+          exclude: |
+            **/.git*
+            **/.git*/**
+            .github/**
+            docs/**
+            data/*.db
+            data/*.db-*
+            data/backups/**
+            public/uploads/**
+      - name: Секретов нет
+        if: steps.secrets.outputs.ready != 'yes'
+        run: echo "::notice::FTP-секреты не заданы, выкладка пропущена."
