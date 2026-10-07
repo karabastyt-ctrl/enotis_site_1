@@ -1,0 +1,10 @@
+Options -Indexes
+DirectoryIndex index.php
+
+RewriteEngine On
+# Существующие файлы (css, js, фото) отдаются как есть.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+# Всё остальное — в роутер.
+RewriteRule ^ index.php [L,QSA]

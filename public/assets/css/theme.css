@@ -1,0 +1,10 @@
+/* Переменные темы. Размеры текста блоков (спецификация 2.0, раздел 5.2) появятся на этапе 3. */
+:root {
+  --color-bg: #faf8f5;
+  --color-text: #1f1b16;
+  --color-muted: #6b6259;
+  --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+body { margin: 0; background: var(--color-bg); color: var(--color-text); font-family: var(--font-body); }
+.page { max-width: 960px; margin: 0 auto; padding: 48px 16px; }
+a { color: inherit; }
