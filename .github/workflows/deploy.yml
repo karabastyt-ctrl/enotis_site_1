@@ -24,11 +24,15 @@ jobs:
           extensions: pdo_sqlite
       - name: Синтаксис PHP
         run: find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
-      - name: Сайт отвечает
+      - name: Переводы на всех языках
+        run: php bin/check-lang.php
+      - name: Сайт отвечает, база создаётся сама
         run: |
           php -S 127.0.0.1:8080 -t public public/index.php >/tmp/php.log 2>&1 &
           sleep 1
-          curl -fsS http://127.0.0.1:8080/health
+          latest=$(ls app/migrations/[0-9][0-9][0-9]_*.sql | tail -1 | xargs basename | cut -c1-3 | sed 's/^0*//')
+          curl -fsS http://127.0.0.1:8080/health | tee /tmp/health.txt
+          grep -q " schema=$latest\$" /tmp/health.txt
           curl -fsS http://127.0.0.1:8080/ | grep -q '<h1>'
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/net-takoy)" = 404
 
@@ -57,9 +61,12 @@ jobs:
             **/.git*/**
             .github/**
             docs/**
-            data/*.db
-            data/*.db-*
+            data/site.sqlite*
+            data/*.lock
+            data/config.php
+            data/reset-password.txt
             data/backups/**
+            data/uploads/**
             public/uploads/**
       - name: Секретов нет
         if: steps.secrets.outputs.ready != 'yes'
