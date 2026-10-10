@@ -32,6 +32,10 @@ function strip_ids(array $site): array
             foreach ($b['methods'] ?? [] as $i => $m) {
                 unset($b['methods'][$i]['id']);
             }
+            foreach ($b['tabs'] ?? [] as $i => $tab) {
+                $b['tabs'][$i]['blocks'] = $strip($tab['blocks'] ?? []);
+                $b['tabs'][$i]['operator'] = isset($tab['operator']) && $tab['operator'] !== null ? 'f' . $tab['operator'] : null;
+            }
             if (isset($b['tiles'])) {
                 foreach ($b['tiles'] as &$t) {
                     unset($t['id']);

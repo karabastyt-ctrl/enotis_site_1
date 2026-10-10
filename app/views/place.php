@@ -1,6 +1,6 @@
 <?php
 /** «Как добраться»: текст, мини-карта и кнопки карт (раздел 6.2). */
-$svc = setting('maps', 'google');
+$svc = feed_setting('maps', 'google');
 ?>
 <section class="place">
   <h3 class="place__h"><?= e(t('tile.how_to_get')) ?></h3>

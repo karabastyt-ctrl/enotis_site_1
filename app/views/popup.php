@@ -3,7 +3,7 @@ $wine = is_wine($t);
 $frame = $wine ? '4x5' : str_replace(':', 'x', node($t['parent_id'])['frame'] ?? '4:5');
 $hid = 'pp-title-' . $t['id'];
 ?>
-<div class="ov<?= $isOpen ? ' is-open' : '' ?>" data-overlay data-popup="<?= e($t['slug']) ?>">
+<div class="ov<?= $isOpen ? ' is-open' : '' ?>" data-overlay data-popup="<?= (int) $t['id'] ?>">
   <div class="pp<?= $wine ? ' pp--wine' : '' ?>" role="dialog" aria-modal="true" aria-labelledby="<?= $hid ?>" tabindex="-1">
     <div class="pp__bar">
       <a class="pp__back" href="<?= e($pageUrl) ?>" data-close><?= e(t('nav.to_list')) ?></a>

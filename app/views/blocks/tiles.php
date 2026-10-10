@@ -4,6 +4,8 @@ $size = $b['tiles_size'] ?: ($wine ? 'compact' : 'large');
 $frame = $wine ? '4x5' : str_replace(':', 'x', $b['frame'] ?: '4:5');
 $tiles = visible_children($b);
 $GLOBALS['eager'] ??= 3;
+// Бейдж таба на плитках уровня 1 в ленте таба; на адресе одного таба его нет (раздел 5.4).
+$badge = ($b['section_id'] !== null && $b['parent_id'] === null && !single_tab()) ? (sections()[$b['section_id']]['title'] ?? null) : null;
 $sizes = $size === 'large' ? '(min-width: 1024px) 360px, (min-width: 600px) 50vw, 100vw'
                            : '(min-width: 1024px) 270px, (min-width: 600px) 33vw, 50vw';
 ?>
@@ -16,12 +18,12 @@ $sizes = $size === 'large' ? '(min-width: 1024px) 360px, (min-width: 600px) 50vw
     $opens = tile_opens($t);
     $lazy = $GLOBALS['eager']-- <= 0;
     $tag = $opens ? 'a' : 'div';
-    $attr = $opens ? ' href="' . e(tile_url($t)) . '"' . ($opens === 'popup' ? ' data-popup-link="' . e($t['slug']) . '"' : '') : '';
+    $attr = $opens ? ' href="' . e(tile_url($t)) . '"' . ($opens === 'popup' ? ' data-popup-link="' . (int) $t['id'] . '"' : '') : '';
 ?>
     <li<?= eid($t['id']) ?>>
       <<?= $tag ?> class="card<?= $wine ? ' card--wine' : '' ?>"<?= $attr ?>>
 <?php if ($t['photo']): ?>
-        <span class="frame frame--<?= $frame ?><?= $wine ? ' frame--wine' : '' ?>"><?= photo_img($t['photo'], $t['title'], $lazy, false, $sizes) ?></span>
+        <span class="frame frame--<?= $frame ?><?= $wine ? ' frame--wine' : '' ?>"><?= photo_img($t['photo'], $t['title'], $lazy, false, $sizes) ?><?php if ($badge && !$wine): ?><span class="badge"><?= e($badge) ?></span><?php endif ?></span>
 <?php elseif ($wine): ?>
         <span class="frame frame--4x5 frame--wine"><?= view('bottle') ?></span>
 <?php endif ?>

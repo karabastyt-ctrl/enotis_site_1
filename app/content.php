@@ -9,15 +9,18 @@ declare(strict_types=1);
 const I18N_FIELDS = ['eyebrow', 'title', 'subtitle', 'body', 'place', 'grape', 'button_label',
                      'recipient', 'pay_purpose', 'price_note', 'seo_title', 'seo_description'];
 
-/** Все элементы ленты сайта (без табов) деревом. Тексты — на текущем языке. */
+/**
+ * Все элементы сайта деревом. Тексты — на текущем языке (кэш на каждый язык: sitemap обходит все).
+ * roots[0] — блоки главной (общие над табами и сам блок Табы), roots[id таба] — лента таба.
+ */
 function content_tree(): array
 {
-    static $tree = null;
-    if ($tree !== null) {
-        return $tree;
-    }
+    static $cache = [];
     $lang = current_lang();
-    $rows = db()->query('SELECT * FROM elements WHERE section_id IS NULL ORDER BY position, id')->fetchAll();
+    if (isset($cache[$lang])) {
+        return $cache[$lang];
+    }
+    $rows = db()->query('SELECT * FROM elements ORDER BY position, id')->fetchAll();
     $st = db()->prepare('SELECT * FROM element_i18n WHERE lang = ?');
     $st->execute([$lang]);
     $texts = [];
@@ -35,6 +38,7 @@ function content_tree(): array
         $n = $r;
         $n['id'] = $id;
         $n['parent_id'] = $r['parent_id'] === null ? null : (int) $r['parent_id'];
+        $n['section_id'] = $r['section_id'] === null ? null : (int) $r['section_id'];
         foreach (I18N_FIELDS as $f) {
             $v = $texts[$id][$f] ?? null;
             $n[$f] = ($v === null || trim($v) === '') ? null : $v;
@@ -43,21 +47,197 @@ function content_tree(): array
         $n['children'] = [];
         $nodes[$id] = $n;
     }
-    $roots = [];
+    $roots = [0 => []];
     foreach ($nodes as $id => $n) {
         if ($n['parent_id'] === null) {
-            $roots[] = $id;
+            $roots[$n['section_id'] ?? 0][] = $id;
         } elseif (isset($nodes[$n['parent_id']])) {
             $nodes[$n['parent_id']]['children'][] = $id;
         }
     }
-    $tree = ['nodes' => $nodes, 'roots' => $roots];
-    return $tree;
+    return $cache[$lang] = ['nodes' => $nodes, 'roots' => $roots];
 }
 
 function node(int $id): array
 {
     return content_tree()['nodes'][$id];
+}
+
+/* ---------------------------------------------------------------- табы и адреса (разделы 3.3, 4.2, 4.5) */
+
+/** Все табы по порядку, подпись — на текущем языке. Ключ — id таба. */
+function sections(): array
+{
+    static $cache = [];
+    $lang = current_lang();
+    if (isset($cache[$lang])) {
+        return $cache[$lang];
+    }
+    $st = db()->prepare('SELECT s.*, i.title FROM sections s LEFT JOIN section_i18n i ON i.section_id = s.id AND i.lang = ?
+        ORDER BY s.position, s.id');
+    $st->execute([$lang]);
+    $out = [];
+    foreach ($st->fetchAll() as $s) {
+        $s['id'] = (int) $s['id'];
+        $s['title'] = trim((string) $s['title']) === '' ? null : $s['title'];
+        $out[$s['id']] = $s;
+    }
+    return $cache[$lang] = $out;
+}
+
+/** Блок Табы главной, если он есть и не скрыт. */
+function tabs_block(): ?array
+{
+    foreach (content_tree()['roots'][0] as $id) {
+        $n = node($id);
+        if ($n['type'] === 'tabs') {
+            return (int) $n['hidden'] === 1 ? null : $n;
+        }
+    }
+    return null;
+}
+
+/** Таб виден: блок Табы есть, таб не скрыт и подписан на текущем языке (раздел 4.6). */
+function tab_visible(?array $s): bool
+{
+    return $s !== null && (int) $s['hidden'] === 0 && $s['title'] !== null && tabs_block() !== null;
+}
+
+/** Табы на полосе: на общем адресе — все видимые, на адресе таба полосы нет. */
+function visible_tabs(): array
+{
+    if (single_tab() || !tabs_block()) {
+        return [];
+    }
+    return array_values(array_filter(sections(), 'tab_visible'));
+}
+
+/** Список адресов из «Настройки сайта → Адреса»: host, section_id, названия сайта по языкам. */
+function domains(): array
+{
+    static $list = null;
+    if ($list !== null) {
+        return $list;
+    }
+    $list = [];
+    foreach (db()->query('SELECT * FROM domains ORDER BY position, host')->fetchAll() as $d) {
+        $list[$d['host']] = ['host' => $d['host'], 'section_id' => $d['section_id'] === null ? null : (int) $d['section_id'], 'titles' => []];
+    }
+    foreach (db()->query('SELECT host, lang, site_title FROM domain_i18n')->fetchAll() as $r) {
+        if (isset($list[$r['host']]) && trim((string) $r['site_title']) !== '') {
+            $list[$r['host']]['titles'][$r['lang']] = $r['site_title'];
+        }
+    }
+    return $list;
+}
+
+/** Хост запроса без порта и «www.». */
+function request_host(): string
+{
+    $h = strtolower(preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')));
+    return preg_replace('/[^a-z0-9.\-]/', '', $h);
+}
+
+/**
+ * Адрес, на котором открыт сайт (раздел 4.5): по заголовку Host; нет в списке — первый; списка нет — null.
+ * $override — превью админки показывает сайт «на выбранном адресе».
+ */
+function current_domain(?string $override = null): ?array
+{
+    static $cur = false;
+    if ($override !== null) {
+        $cur = domains()[$override] ?? false;
+    }
+    if ($cur !== false) {
+        return $cur;
+    }
+    $all = domains();
+    if (!$all) {
+        return $cur = null;
+    }
+    $host = request_host();
+    return $cur = $all[$host] ?? $all[preg_replace('/^www\./', '', $host)] ?? $all['www.' . $host] ?? reset($all);
+}
+
+/** Адрес одного таба: сайт целиком — лента этого таба, без полосы и общих блоков. */
+function single_tab(): ?array
+{
+    $d = current_domain();
+    if (!$d || $d['section_id'] === null || !tabs_block()) {
+        return null;
+    }
+    return sections()[$d['section_id']] ?? null;
+}
+
+/**
+ * Лента, чьи настройки сейчас действуют (раздел 3.4): id таба или null (сайт).
+ * Без аргумента — текущая; с аргументом — переключает и возвращает прежнюю.
+ */
+function feed(int|null|false $set = false): ?int
+{
+    static $cur = null;
+    $prev = $cur;
+    if ($set !== false) {
+        $cur = $set;
+    }
+    return $prev;
+}
+
+/** Настройка «страны» текущей ленты: валюта, формат реквизитов, владелец, сервис карт, цены вин. */
+function feed_setting(string $key, ?string $default = null): ?string
+{
+    $sid = feed();
+    if ($sid !== null && ($s = sections()[$sid] ?? null)) {
+        $v = $s[$key] ?? null;
+        return $v === null ? $default : (string) $v;
+    }
+    return setting($key, $default);
+}
+
+/** Активный таб главной: выбран адресом или первый видимый. */
+function active_tab(array|null|false $set = false): ?array
+{
+    static $tab = null;
+    if ($set !== false) {
+        $tab = $set;
+    }
+    return $tab;
+}
+
+/** Видимые блоки ленты (0 — главная, иначе таб), без блока Табы. $noMaps — для карты: она не проверяет саму себя. */
+function root_blocks(int $section, bool $noMaps = false): array
+{
+    $out = [];
+    foreach (content_tree()['roots'][$section] ?? [] as $id) {
+        $n = node($id);
+        if ($n['type'] !== 'tabs' && !($noMaps && $n['type'] === 'map') && is_visible($n)) {
+            $out[] = $n;
+        }
+    }
+    return $out;
+}
+
+/** Плитки, которые видит главная: общие и активного таба (бургер, карта главной, раздел 5.4). */
+function home_feed_blocks(bool $noMaps = false): array
+{
+    if ($s = single_tab()) {
+        return root_blocks($s['id'], $noMaps);
+    }
+    $blocks = root_blocks(0, $noMaps);
+    if ($tab = active_tab()) {
+        $blocks = array_merge($blocks, root_blocks($tab['id'], $noMaps));
+    }
+    return $blocks;
+}
+
+/** Префикс адреса ленты: «/gruziya» у таба на общем адресе, иначе пусто. */
+function feed_prefix(?int $section): string
+{
+    if ($section === null || single_tab()) {
+        return '';
+    }
+    $s = sections()[$section] ?? null;
+    return $s ? '/' . $s['slug'] : '';
 }
 
 /** Видим ли элемент посетителю на текущем языке (разделы 4.3, 4.6). */
@@ -90,15 +270,15 @@ function visible_children(array $n): array
     return $out;
 }
 
-/** Блоки главной (уровень 1). */
+/** Блоки главной (уровень 1): общие и блок Табы последним; на адресе таба — лента таба. */
 function home_blocks(): array
 {
-    $out = [];
-    foreach (content_tree()['roots'] as $id) {
-        $n = node($id);
-        if (is_visible($n)) {
-            $out[] = $n;
-        }
+    if ($s = single_tab()) {
+        return root_blocks($s['id']);
+    }
+    $out = root_blocks(0);
+    if (visible_tabs()) {
+        $out[] = tabs_block();
     }
     return $out;
 }
@@ -151,7 +331,7 @@ function owner_tile(array $n): ?array
 function tile_url(array $tile): string
 {
     $page = tile_level($tile) === 2 ? owner_tile(node($tile['parent_id'])) : null;
-    return url(($page ? '/' . $page['slug'] : '') . '/' . $tile['slug']);
+    return url(feed_prefix($tile['section_id']) . ($page ? '/' . $page['slug'] : '') . '/' . $tile['slug']);
 }
 
 /** Все видимые плитки внутри набора блоков (без захода на страницы плиток). */
@@ -186,7 +366,12 @@ function find_tile(array $blocks, string $slug): ?array
 function map_points(array $mapBlock): array
 {
     $owner = owner_tile($mapBlock);
-    $blocks = blocks_without_maps($owner ? $owner['children'] : content_tree()['roots']);
+    if ($owner) {
+        $blocks = array_filter(array_map('node', $owner['children']), fn($b) => $b['type'] !== 'map' && is_visible($b));
+    } else {
+        // Карта общих блоков на главной с табами показывает и активный таб (раздел 5.4).
+        $blocks = $mapBlock['section_id'] !== null ? root_blocks($mapBlock['section_id'], true) : home_feed_blocks(true);
+    }
     $points = [];
     foreach (tiles_in($blocks) as $t) {
         if (has_coords($t)) {
@@ -203,23 +388,11 @@ function map_points(array $mapBlock): array
     return $points;
 }
 
-/** Видимые блоки без карт: карта ищет точки, не проверяя саму себя. */
-function blocks_without_maps(array $ids): array
-{
-    $out = [];
-    foreach ($ids as $id) {
-        $n = node($id);
-        if ($n['type'] !== 'map' && is_visible($n)) {
-            $out[] = $n;
-        }
-    }
-    return $out;
-}
-
 /** Включённые способы оплаты блока, с подписями на текущем языке. */
 function pay_methods(int $elementId): array
 {
-    static $all = null;
+    static $cache = [];
+    $all = &$cache[current_lang()];
     if ($all === null) {
         $all = [];
         $st = db()->prepare('SELECT m.*, i.label FROM pay_methods m
@@ -237,7 +410,7 @@ function pay_methods(int $elementId): array
 /** Владелец (оператор) ленты: подвал и окно оплаты. */
 function operator(): ?array
 {
-    $id = setting('operator_id');
+    $id = feed_setting('operator_id');
     if (!$id) {
         return null;
     }
@@ -261,8 +434,16 @@ function setting_text(string $key): ?string
     return $cache[$key][current_lang()] ?? $cache[$key][default_lang()] ?? null;
 }
 
+/** Название сайта: у адреса своё (раздел 4.5), без перевода — с основного языка, иначе из настроек. */
 function site_title(): string
 {
+    $d = current_domain();
+    if ($d) {
+        $t = $d['titles'][current_lang()] ?? $d['titles'][default_lang()] ?? null;
+        if ($t !== null) {
+            return $t;
+        }
+    }
     return setting_text('site_title') ?? '';
 }
 
@@ -305,10 +486,11 @@ function paragraphs(?string $text): array
 /** Цена с валютой ленты: «30 ₾», «1 500 ₽». */
 function money(float $price): string
 {
-    $sym = ['RUB' => '₽', 'GEL' => '₾', 'EUR' => '€', 'USD' => '$'][setting('currency', 'RUB')] ?? '';
+    $cur = feed_setting('currency', 'RUB');
+    $sym = ['RUB' => '₽', 'GEL' => '₾', 'EUR' => '€', 'USD' => '$'][$cur] ?? '';
     $dec = fmod($price, 1.0) == 0.0 ? 0 : 2;
     $num = number_format($price, $dec, ',', "\u{202F}");
-    return setting('currency') === 'USD' ? $sym . $num : $num . "\u{00A0}" . $sym;
+    return $cur === 'USD' ? $sym . $num : $num . "\u{00A0}" . $sym;
 }
 
 /** Тип вина: «полусухое, красное» (раздел 5.5). */
@@ -344,5 +526,5 @@ function wine_facts(array $w): array
 
 function show_prices(): bool
 {
-    return setting('show_prices', '1') === '1';
+    return feed_setting('show_prices', '1') === '1';
 }

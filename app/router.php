@@ -39,6 +39,15 @@ function route(string $uri): void
         return;
     }
 
+    if ($path === '/robots.txt') {
+        robots_txt();
+        return;
+    }
+    if ($path === '/sitemap.xml') {
+        sitemap_xml();
+        return;
+    }
+
     $segs = $path === '/' ? [] : explode('/', substr($path, 1));
 
     // Язык из префикса: /ka/…, /en/…; основной язык — без префикса (раздел 4.6).
@@ -69,33 +78,67 @@ function route(string $uri): void
         redirect(url($page['path']), 302);
         return;
     }
+    // Табы без перезагрузки: JS просит только ленту таба и шапку (раздел 5.4).
+    if (isset($_GET['fragment']) && $page['view'] === 'page_home' && !$page['popup']) {
+        tab_fragment($page);
+        return;
+    }
     render($page['view'], $page);
 }
 
-/** Что показать по адресу без языкового префикса. null — 404. */
+/**
+ * Что показать по адресу без языкового префикса (разделы 4.1, 4.2, 4.5). null — 404.
+ * Заодно выбирает активный таб и ленту, чьи настройки действуют на странице.
+ */
 function resolve_page(array $segs): ?array
 {
-    $home = home_blocks();
     $n = count($segs);
-
-    if ($n === 0) {
-        return home_page($home, null);
-    }
+    active_tab(null);
+    feed(null);
     if ($n === 2 && $segs[0] === 'doc') {
         $d = doc($segs[1]);
-        return $d ? ['view' => 'page_doc', 'doc' => $d, 'path' => '/doc/' . $segs[1],
+        return $d ? page_base('page_doc', '/doc/' . $segs[1], null) + ['doc' => $d,
                      'title' => $d['title'] . ' — ' . site_title(), 'back' => url('/')] : null;
     }
-    if ($n > 2) {
-        return null;
+
+    // Адрес одного таба: лента таба — это и есть сайт, адреса без префикса.
+    if ($single = single_tab()) {
+        if (!tab_visible($single)) {
+            return null;
+        }
+        active_tab($single);
+        feed($single['id']);
+        return $n === 0 ? home_page(null) : resolve_in(root_blocks($single['id']), $segs);
     }
 
-    $tile = find_tile($home, $segs[0]);
+    $tabs = visible_tabs();
+    if ($tabs && $n > 0) {
+        foreach ($tabs as $tab) {
+            if ($tab['slug'] === $segs[0]) {
+                active_tab($tab);
+                feed($tab['id']);
+                return $n === 1 ? home_page(null) : resolve_in(root_blocks($tab['id']), array_slice($segs, 1));
+            }
+        }
+    }
+    // Главная и плитки общих блоков над табами: активен первый таб, адреса без префикса.
+    active_tab($tabs[0] ?? null);
+    return $n === 0 ? home_page(null) : resolve_in(root_blocks(0), $segs);
+}
+
+/** Плитка по адресу внутри ленты: страница, поп-ап на главной или поп-ап на странице плитки. */
+function resolve_in(array $blocks, array $segs): ?array
+{
+    $n = count($segs);
+    if ($n === 0 || $n > 2) {
+        return null;
+    }
+    $tile = find_tile($blocks, $segs[0]);
     $opens = $tile ? tile_opens($tile) : null;
     if ($n === 1) {
         return match ($opens) {
             'page'  => tile_page($tile, null),
-            'popup' => home_page($home, $tile),
+            'popup' => home_page($tile),
             default => null,
         };
     }
@@ -106,30 +149,40 @@ function resolve_page(array $segs): ?array
     return ($inner && tile_opens($inner) === 'popup') ? tile_page($tile, $inner) : null;
 }
 
-function home_page(array $blocks, ?array $popup): array
+/** Общие поля страницы: адрес внутри ленты (local) и лента (section) — для ссылок, canonical и hreflang. */
+function page_base(string $view, string $local, ?int $section): array
 {
-    $title = setting_text('seo_title') ?? site_title();
-    $desc = setting_text('seo_description');
+    return ['view' => $view, 'local' => $local, 'section' => $section, 'path' => join_path(feed_prefix($section), $local), 'popup' => null];
+}
+
+function home_page(?array $popup): array
+{
+    $tab = single_tab() ? null : (feed() !== null ? active_tab() : null);
+    $title = $tab ? $tab['title'] . ' — ' . site_title() : (setting_text('seo_title') ?? site_title());
+    $desc = $tab ? null : setting_text('seo_description');
+    $blocks = home_blocks();
     if ($desc === null) {
-        foreach ($blocks as $b) {
+        foreach (array_merge($blocks, active_tab() ? root_blocks(active_tab()['id']) : []) as $b) {
             if ($b['type'] === 'text' && $b['body']) {
                 $desc = $b['body'];
                 break;
             }
         }
     }
-    $page = ['view' => 'page_home', 'blocks' => $blocks, 'path' => '/', 'title' => $title,
-             'description' => $desc, 'popup' => null];
+    $section = ($single = single_tab()) ? $single['id'] : ($tab ? $tab['id'] : null);
+    $page = page_base('page_home', '/', $section)
+          + ['blocks' => $blocks, 'title' => $title, 'description' => $desc, 'jsonld' => $tab ? null : 'website'];
     return $popup ? with_popup($page, $popup, null) : $page;
 }
 
 function tile_page(array $tile, ?array $popup): array
 {
     $title = $tile['seo_title'] ?? ($tile['title'] . ' — ' . site_title());
-    $page = ['view' => 'page_tile', 'tile' => $tile, 'blocks' => visible_children($tile),
-             'path' => '/' . $tile['slug'], 'title' => $title,
+    $tab = single_tab() ? null : ($tile['section_id'] !== null ? (sections()[$tile['section_id']] ?? null) : null);
+    $page = page_base('page_tile', '/' . $tile['slug'], $tile['section_id'])
+          + ['tile' => $tile, 'blocks' => visible_children($tile), 'title' => $title, 'tab' => $tab,
              'description' => $tile['seo_description'] ?? $tile['subtitle'] ?? $tile['body'],
-             'back' => url('/'), 'popup' => null];
+             'back' => url($tab ? '/' . $tab['slug'] : '/'), 'image' => $tile['photo'], 'jsonld' => 'breadcrumbs'];
     return $popup ? with_popup($page, $popup, $tile) : $page;
 }
 
@@ -137,11 +190,27 @@ function tile_page(array $tile, ?array $popup): array
 function with_popup(array $page, array $tile, ?array $owner): array
 {
     $page['popup'] = $tile;
-    $page['path'] = ($owner ? '/' . $owner['slug'] : '') . '/' . $tile['slug'];
+    $page['local'] = ($owner ? '/' . $owner['slug'] : '') . '/' . $tile['slug'];
+    $page['section'] = $tile['section_id'];
+    $page['path'] = join_path(feed_prefix($tile['section_id']), $page['local']);
     $page['title'] = $tile['seo_title']
         ?? implode(' — ', array_filter([$tile['title'], $owner['title'] ?? null, site_title()]));
     $page['description'] = $tile['seo_description'] ?? $tile['subtitle'] ?? $tile['body'];
+    $page['image'] = $tile['photo'] ?? ($page['image'] ?? null);
+    $page['jsonld'] = 'popup';
     return $page;
+}
+
+/** Лента таба для переключения без перезагрузки: JSON с заголовком, шапкой и лентой. */
+function tab_fragment(array $page): void
+{
+    header('Content-Type: application/json; charset=utf-8');
+    header('Vary: X-Requested-With');
+    $tab = active_tab();
+    $GLOBALS['h1_done'] = true; // <h1> страницы уже есть: над табами или скрытый
+    $feed = $tab ? view('tabfeed', ['tab' => $tab, 'popup' => null]) : '';
+    echo json_encode(['title' => $page['title'], 'header' => view('header', ['back' => null]), 'feed' => $feed],
+                     JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 }
 
 function not_found(): void

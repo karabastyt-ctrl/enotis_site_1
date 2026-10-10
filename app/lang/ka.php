@@ -9,6 +9,7 @@ return [
     'error.not_found'            => 'გვერდი ვერ მოიძებნა',
     'error.back_home'            => 'მთავარ გვერდზე',
     'nav.menu'                   => 'მენიუ',
+    'nav.tabs'                   => 'განყოფილებები',
     'nav.language'               => 'ენა',
     'nav.back'                   => '← უკან',
     'nav.to_list'                => '‹ სიაში',

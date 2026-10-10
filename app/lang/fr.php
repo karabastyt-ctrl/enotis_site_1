@@ -9,6 +9,7 @@ return [
     'error.not_found'            => 'Page introuvable',
     'error.back_home'            => 'Accueil',
     'nav.menu'                   => 'Menu',
+    'nav.tabs'                   => 'Rubriques',
     'nav.language'               => 'Langue',
     'nav.back'                   => '← Retour',
     'nav.to_list'                => '‹ Retour à la liste',

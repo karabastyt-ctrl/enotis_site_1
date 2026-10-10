@@ -3,6 +3,7 @@
 $title ??= site_title();
 $desc = isset($description) && $description !== null ? mb_substr(preg_replace('/\s+/u', ' ', $description), 0, 160) : null;
 $langs = site_languages();
+$section ??= null;
 $locale = ['ru' => 'ru_RU', 'ka' => 'ka_GE', 'en' => 'en_US', 'fr' => 'fr_FR'][current_lang()];
 $cookie = setting('cookie_notice', '1') === '1';
 $cookieDoc = doc('cookies');
@@ -16,21 +17,32 @@ $cookieDoc = doc('cookies');
 <?php if ($desc): ?>
   <meta name="description" content="<?= e($desc) ?>">
 <?php endif ?>
-<?php if (isset($path) && $path !== null): ?>
-  <link rel="canonical" href="<?= e(abs_url(url($path))) ?>">
+<?php if (isset($local) && $path !== null):
+    $canon = canonical_url($local, $section);
+    $img = og_image($image ?? null);
+    $ld = page_jsonld(get_defined_vars());
+?>
+  <link rel="canonical" href="<?= e($canon) ?>">
 <?php   if (count($langs) > 1): foreach ($langs as $l): ?>
-  <link rel="alternate" hreflang="<?= e($l['code']) ?>" href="<?= e(abs_url(url($path, $l['code']))) ?>">
+  <link rel="alternate" hreflang="<?= e($l['code']) ?>" href="<?= e(canonical_url($local, $section, $l['code'])) ?>">
 <?php   endforeach ?>
-  <link rel="alternate" hreflang="x-default" href="<?= e(abs_url(url($path, default_lang()))) ?>">
+  <link rel="alternate" hreflang="x-default" href="<?= e(canonical_url($local, $section, default_lang())) ?>">
 <?php   endif ?>
-  <meta property="og:type" content="website">
+  <meta property="og:type" content="<?= ($jsonld ?? null) === 'website' ? 'website' : 'article' ?>">
   <meta property="og:title" content="<?= e($title) ?>">
 <?php   if ($desc): ?>
   <meta property="og:description" content="<?= e($desc) ?>">
 <?php   endif ?>
-  <meta property="og:url" content="<?= e(abs_url(url($path))) ?>">
+  <meta property="og:url" content="<?= e($canon) ?>">
+<?php   if ($img): ?>
+  <meta property="og:image" content="<?= e($img) ?>">
+  <meta name="twitter:card" content="summary_large_image">
+<?php   endif ?>
   <meta property="og:site_name" content="<?= e(site_title()) ?>">
   <meta property="og:locale" content="<?= e($locale) ?>">
+<?php   if ($ld): ?>
+  <script type="application/ld+json"><?= json_encode($ld, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
+<?php   endif ?>
 <?php endif ?>
   <link rel="preload" href="/assets/fonts/golos-400-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/assets/fonts/playfair-600-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
@@ -38,7 +50,7 @@ $cookieDoc = doc('cookies');
   <link rel="stylesheet" href="/assets/css/theme.css?v=<?= ENGINE_VERSION ?>">
   <link rel="stylesheet" href="/assets/css/site.css?v=<?= ENGINE_VERSION ?>">
   <script src="/assets/js/site.js?v=<?= ENGINE_VERSION ?>" defer></script>
-<?php if ($code = setting('counter_code')): ?>
+<?php if (!preview_mode() && ($code = setting('counter_code'))): ?>
   <?= $code /* код счётчика из админки, вставляется как есть (раздел 9.2) */ ?>
 <?php endif ?>
 </head>

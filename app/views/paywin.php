@@ -1,7 +1,7 @@
 <?php
 /** Окно оплаты (раздел 7). Без JS открывается по якорю #pay-N (CSS :target). */
 $methods = pay_methods((int) $b['id']);
-$format = setting('req_format', 'RU');
+$format = feed_setting('req_format', 'RU');
 $fields = [
     'RU'    => ['recipient' => 'req.recipient', 'inn' => 'req.inn', 'bank' => 'req.bank', 'bik' => 'req.bik', 'account' => 'req.account'],
     'GE'    => ['recipient' => 'req.recipient', 'code' => 'req.code', 'bank' => 'req.bank', 'iban' => 'req.iban', 'swift' => 'req.swift'],

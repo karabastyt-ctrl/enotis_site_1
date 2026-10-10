@@ -17,11 +17,11 @@
       lastY = y;
     }, { passive: true });
   }
-  var menu = $('[data-menu]');
-  if (menu) {
-    menu.addEventListener('click', function (e) { if (e.target.closest('a')) menu.open = false; });
-    document.addEventListener('click', function (e) { if (!menu.contains(e.target)) menu.open = false; });
-  }
+  // Меню бургера закрывается выбором пункта и щелчком мимо; шапку перерисовывает переключение табов.
+  document.addEventListener('click', function (e) {
+    var menu = $('[data-menu]');
+    if (menu && (e.target.closest('[data-menu] a') || !menu.contains(e.target))) menu.open = false;
+  });
 
   /* ---------- Окна: ловят фокус, закрываются Esc и по затемнению ---------- */
   var FOCUSABLE = 'a[href], button:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
@@ -107,15 +107,53 @@
 
   document.addEventListener('click', function (e) {
     var a = e.target.closest('[data-popup-link]');
-    if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+    if (!a || e.defaultPrevented || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
     if (openPopup(a.getAttribute('data-popup-link'), true)) e.preventDefault();
   });
 
   window.addEventListener('popstate', function (e) {
     var slug = e.state && e.state.popup;
     if (current) closeTop(true);
+    if (e.state && e.state.tab && e.state.tab !== tabUrl) loadTab(e.state.tab, false);
     if (slug) openPopup(slug, false);
   });
+
+  /* ---------- Табы без перезагрузки (раздел 5.4): лента таба приходит фрагментом ---------- */
+  var tabUrl = location.pathname;
+  var tabsNav = $('[data-tabs]');
+  function loadTab(href, push) {
+    var box = $('[data-tab-feed]');
+    if (!box || !window.fetch) { location.href = href; return; }
+    box.classList.add('is-loading');
+    fetch(href + (href.indexOf('?') < 0 ? '?' : '&') + 'fragment=1', { headers: { 'X-Requested-With': 'fetch' } })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (j) {
+        box.innerHTML = j.feed;
+        box.classList.remove('is-loading');
+        var tmp = document.createElement('div');
+        tmp.innerHTML = j.header;
+        var fresh = $('.hdr__in', tmp), old = $('.hdr__in');
+        if (fresh && old) old.replaceWith(fresh);
+        $$('[data-tab]').forEach(function (a) {
+          if (a.getAttribute('href') === href) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+        });
+        tabUrl = href; pageUrl = href; pageTitle = j.title; document.title = j.title;
+        if (push) history.pushState({ tab: href }, '', href);
+        var top = tabsNav.getBoundingClientRect().top + window.scrollY - 16;
+        if (window.scrollY > top) window.scrollTo(0, top);
+        watchMaps(box);
+      })
+      .catch(function () { location.href = href; });
+  }
+  if (tabsNav) {
+    if (!$('.ov.is-open[data-popup]')) history.replaceState({ tab: tabUrl }, '', location.href);
+    tabsNav.addEventListener('click', function (e) {
+      var a = e.target.closest('[data-tab]');
+      if (!a || e.defaultPrevented || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+      e.preventDefault();
+      if (a.getAttribute('href') !== tabUrl) loadTab(a.getAttribute('href'), true);
+    });
+  }
 
   // Поп-ап, открытый по прямому адресу, сервер отдал уже открытым.
   var opened = $('.ov.is-open[data-popup]');
@@ -246,19 +284,15 @@
     });
   }
 
-  var maps = $$('[data-map]');
-  if (maps.length) {
-    if ('IntersectionObserver' in window) {
-      var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (en) {
-          if (en.isIntersecting) { io.unobserve(en.target); initMap(en.target); }
-        });
-      }, { rootMargin: '300px' });
-      maps.forEach(function (m) { io.observe(m); });
-    } else {
-      maps.forEach(initMap);
-    }
+  var io = 'IntersectionObserver' in window ? new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (en.isIntersecting) { io.unobserve(en.target); initMap(en.target); }
+    });
+  }, { rootMargin: '300px' }) : null;
+  function watchMaps(root) {
+    $$('[data-map]', root).forEach(function (m) { if (io) io.observe(m); else initMap(m); });
   }
+  watchMaps(document);
   // Мини-карта на странице плитки («Как добраться» вне поп-апа).
   $$('[data-minimap]').forEach(function (box) { if (!box.closest('.ov')) initMinimaps(box.parentNode); });
 

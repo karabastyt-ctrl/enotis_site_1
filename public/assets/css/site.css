@@ -229,3 +229,22 @@ body.is-locked { overflow: hidden; }
 .map__box, .minimap { isolation: isolate; }
 /* Вертикальное фото в поп-апе не занимает весь экран. */
 .pp__photo.frame--4x5 { aspect-ratio: auto; height: min(58vh, 560px); }
+
+/* ---------- Табы (раздел 5.4): «пилюли» по центру, активная — цветом навигации ---------- */
+.tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: var(--blk-gap); margin-bottom: calc(var(--blk-gap) * -.4); }
+.tabs__t { display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; border-radius: 999px; background: var(--c-paper);
+  border: 1px solid var(--c-line); text-decoration: none; font-size: 16px; white-space: nowrap; }
+.tabs__t b { font-weight: 600; color: var(--c-mute); }
+.tabs__t:hover { border-color: var(--c-nav); }
+.tabs__t[aria-current] { background: var(--c-nav); border-color: var(--c-nav); color: var(--c-paper); }
+.tabs__t[aria-current] b { color: var(--c-nav-soft); }
+@media (max-width: 599px) {
+  .tabs { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; }
+  .tabs::-webkit-scrollbar { display: none; }
+}
+.tabfeed { scroll-margin-top: 80px; }
+.tabfeed.is-loading { opacity: .5; transition: opacity .2s; }
+
+/* Бейдж таба поверх фото плитки, слева сверху */
+.badge { position: absolute; top: 12px; left: 12px; padding: 5px 10px; border-radius: 999px; background: var(--c-nav); color: var(--c-paper);
+  font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; line-height: 1.2; }
