@@ -54,7 +54,8 @@ jobs:
           test "$(code /en/doc/offer)" = 404    # нет перевода
           img=$(curl -fsS http://127.0.0.1:8081/ | grep -o '/uploads/photos/[^" ]*-m.jpg' | head -1)
           curl -fsS -o /dev/null -w '%{content_type}\n' "http://127.0.0.1:8081$img" | grep -q image/jpeg
-          ! grep -E 'PHP (Warning|Notice|Deprecated|Fatal)' /tmp/php-sample.log
+          # Предупреждения нашего кода (строку про JIT пишет сам PHP раннера — её пропускаем).
+          if grep -E 'PHP (Warning|Notice|Deprecated|Fatal)' /tmp/php-sample.log | grep -v 'JIT'; then exit 1; fi
 
   deploy:
     needs: check
