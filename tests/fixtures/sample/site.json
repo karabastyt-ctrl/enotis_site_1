@@ -1,0 +1,337 @@
+{
+ "format": 3,
+ "engine": "0.3.0",
+ "languages": {
+  "main": "ru",
+  "on": [
+   "ru",
+   "en"
+  ]
+ },
+ "settings": {
+  "site_title": {
+   "ru": "Тестовый агрегатор",
+   "en": "Test aggregator"
+  },
+  "currency": "GEL",
+  "req_format": "GE",
+  "operator": 1,
+  "maps": "yandex",
+  "show_prices": true,
+  "cookie_notice": true
+ },
+ "header": {
+  "show": true,
+  "burger": "on"
+ },
+ "footer": {
+  "show": true,
+  "email": "info@example.com",
+  "phone": "+995 555 00 00 00"
+ },
+ "social": [
+  {
+   "network": "telegram",
+   "url": "https://t.me/example"
+  },
+  {
+   "network": "whatsapp",
+   "url": "https://wa.me/995555000000"
+  },
+  {
+   "network": "x",
+   "url": "https://x.com/example"
+  },
+  {
+   "network": "dzen",
+   "url": "https://dzen.ru/example"
+  }
+ ],
+ "operators": [
+  {
+   "id": 1,
+   "name": "ИП Тестовый",
+   "country": "GE",
+   "tax_id": "123456789",
+   "reg_no": "",
+   "address": "Тбилиси"
+  }
+ ],
+ "docs": {
+  "offer": {
+   "show": true,
+   "title": {
+    "ru": "Оферта"
+   },
+   "body": {
+    "ru": "Первый абзац оферты.\nВторой абзац."
+   }
+  }
+ },
+ "blocks": [
+  {
+   "type": "text",
+   "eyebrow": {
+    "ru": "Монастыри мира"
+   },
+   "title": {
+    "ru": "Вина обителей",
+    "en": "Monastery wines"
+   },
+   "title_size": "l",
+   "text": {
+    "ru": "Тестовая лента со всеми видами блоков."
+   },
+   "body_size": "lead"
+  },
+  {
+   "type": "photo",
+   "photo": {
+    "file": "alaverdi.webp"
+   },
+   "caption": {
+    "ru": "Алаверди"
+   },
+   "aspect": "3:2",
+   "width": "narrow"
+  },
+  {
+   "type": "tiles",
+   "title": {
+    "ru": "Вина"
+   },
+   "kind": "wine",
+   "size": "compact",
+   "tiles": [
+    {
+     "title": {
+      "ru": "Alaverdi Red"
+     },
+     "subtitle": {
+      "ru": "Грузия · Монастырь Алаверди"
+     },
+     "grape": {
+      "ru": "Саперави"
+     },
+     "vintage": 2015,
+     "wine_color": "red",
+     "wine_sweet": "semidry",
+     "price": 45,
+     "text": {
+      "ru": "Описание вина."
+     },
+     "photo": {
+      "file": "wine-alaverdi.jpg"
+     }
+    },
+    {
+     "title": {
+      "ru": "Ркацители"
+     },
+     "subtitle": {
+      "ru": "Винодельня Алаверди"
+     },
+     "grape": {
+      "ru": "Ркацители"
+     },
+     "vintage": 2018,
+     "wine_color": "white",
+     "wine_sweet": "dry",
+     "price": 38,
+     "text": {},
+     "photo": {
+      "file": "wine-rkatsiteli.jpg"
+     }
+    },
+    {
+     "title": {
+      "ru": "Монаструли"
+     },
+     "subtitle": {
+      "ru": "Грузия · Александроули"
+     },
+     "grape": {
+      "ru": "Муджуретули"
+     },
+     "vintage": 2019,
+     "wine_color": "red",
+     "wine_sweet": "dry",
+     "price": null,
+     "text": {
+      "ru": "Без цены — проверка."
+     },
+     "photo": {
+      "file": "wine-monastruli.jpg"
+     }
+    },
+    {
+     "title": {
+      "ru": "Ватопед Мерло"
+     },
+     "subtitle": {
+      "ru": "Греция · Афон, монастырь Ватопед"
+     },
+     "grape": {
+      "ru": "Мерло"
+     },
+     "vintage": 2017,
+     "wine_color": "red",
+     "wine_sweet": "dry",
+     "price": 52,
+     "text": {
+      "ru": "Описание вина."
+     },
+     "photo": {
+      "file": "wine-vatopedi.jpg"
+     }
+    },
+    {
+     "title": {
+      "ru": "Мцване"
+     },
+     "subtitle": {
+      "ru": "Без фото"
+     },
+     "grape": {
+      "ru": "Мцване"
+     },
+     "vintage": null,
+     "wine_color": "amber",
+     "wine_sweet": "dry",
+     "price": 30,
+     "text": {}
+    }
+   ]
+  },
+  {
+   "type": "tiles",
+   "size": "compact",
+   "aspect": "4:5",
+   "kind": "normal",
+   "tiles": [
+    {
+     "title": {
+      "ru": "Алаверди"
+     },
+     "subtitle": {
+      "ru": "Кахети"
+     },
+     "text": {
+      "ru": "Текст поп-апа."
+     },
+     "place": {
+      "ru": "120 км от Тбилиси"
+     },
+     "lat": 42.0325,
+     "lng": 45.3771,
+     "photo": {
+      "file": "alaverdi.webp"
+     }
+    },
+    {
+     "title": {
+      "ru": "Без текста"
+     },
+     "subtitle": {
+      "ru": "не нажимается"
+     }
+    }
+   ]
+  },
+  {
+   "type": "service",
+   "title": {
+    "ru": "Онлайн-молебен"
+   },
+   "text": {
+    "ru": "Молебен о здравии."
+   },
+   "price": 30,
+   "price_note": {
+    "ru": "за молебен"
+   },
+   "button": {
+    "ru": "Заказать"
+   },
+   "url": "https://example.com/pay",
+   "recipient": {
+    "ru": "Монастырь Алаверди"
+   }
+  },
+  {
+   "type": "service",
+   "title": {
+    "ru": "Экскурсия"
+   },
+   "text": {
+    "ru": "По монастырю."
+   },
+   "button": {
+    "ru": "Заказать"
+   },
+   "url": "https://example.com/tour"
+  },
+  {
+   "type": "service",
+   "title": {
+    "ru": "Без ссылки"
+   },
+   "button": {
+    "ru": "Заказать"
+   }
+  },
+  {
+   "type": "map",
+   "title": {
+    "ru": "На карте"
+   }
+  },
+  {
+   "type": "pay",
+   "title": {
+    "ru": "Пожертвование монастырю"
+   },
+   "text": {
+    "ru": "Любая сумма."
+   },
+   "button": {
+    "ru": "Пожертвовать",
+    "en": "Donate"
+   },
+   "recipient": {
+    "ru": "Монастырь «Алаверди»"
+   },
+   "methods": [
+    {
+     "kind": "link",
+     "provider": "flitt",
+     "on": true,
+     "url": "https://example.com/flitt",
+     "label": {}
+    },
+    {
+     "kind": "link",
+     "provider": "bog",
+     "on": true,
+     "url": "https://example.com/bog",
+     "label": {}
+    },
+    {
+     "kind": "requisites",
+     "provider": "requisites",
+     "on": true,
+     "req": {
+      "recipient": "Монастырь",
+      "code": "204567890",
+      "bank": "TBC",
+      "iban": "GE00TB0000000000000000",
+      "swift": "TBCBGE22",
+      "purpose": {
+       "ru": "Пожертвование"
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

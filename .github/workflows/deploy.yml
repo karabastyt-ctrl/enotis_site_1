@@ -33,8 +33,29 @@ jobs:
           latest=$(ls app/migrations/[0-9][0-9][0-9]_*.sql | tail -1 | xargs basename | cut -c1-3 | sed 's/^0*//')
           curl -fsS http://127.0.0.1:8080/health | tee /tmp/health.txt
           grep -q " schema=$latest\$" /tmp/health.txt
-          curl -fsS http://127.0.0.1:8080/ | grep -q '<h1>'
+          curl -fsS http://127.0.0.1:8080/ | grep -q '<h1'
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/net-takoy)" = 404
+      - name: Тестовая лента со всеми блоками
+        env:
+          ENOTIS_DATA: /tmp/enotis-sample
+        run: |
+          mkdir -p "$ENOTIS_DATA"
+          php bin/import.php tests/fixtures/sample/site.json
+          php -S 127.0.0.1:8081 -t public public/index.php >/tmp/php-sample.log 2>&1 &
+          sleep 1
+          code() { curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8081$1"; }
+          test "$(code /)" = 200
+          test "$(code /alaverdi)" = 200        # поп-ап плитки по прямому адресу
+          test "$(code /alaverdi-red)" = 200    # поп-ап вина
+          test "$(code /bez-teksta)" = 404      # плитке нечего показать
+          test "$(code /en/)" = 200
+          test "$(code /fr/)" = 404             # язык выключен
+          test "$(code /doc/offer)" = 200
+          test "$(code /en/doc/offer)" = 404    # нет перевода
+          img=$(curl -fsS http://127.0.0.1:8081/ | grep -o '/uploads/photos/[^" ]*-m.jpg' | head -1)
+          curl -fsS -o /dev/null -w '%{content_type}\n' "http://127.0.0.1:8081$img" | grep -q image/jpeg
+          # Предупреждения нашего кода (строку про JIT пишет сам PHP раннера — её пропускаем).
+          if grep -E 'PHP (Warning|Notice|Deprecated|Fatal)' /tmp/php-sample.log | grep -v 'JIT'; then exit 1; fi
 
   deploy:
     needs: check

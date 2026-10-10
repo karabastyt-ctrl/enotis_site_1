@@ -1,11 +1,17 @@
 <?php
 declare(strict_types=1);
 
-const ENGINE_VERSION = '0.2.0';
+const ENGINE_VERSION = '0.3.0';
 const APP_DIR  = __DIR__;
 define('ROOT_DIR', dirname(__DIR__));
-define('DATA_DIR', ROOT_DIR . '/data');
+// ENOTIS_DATA — другая папка данных (проверки в CI, вторая копия сайта на одной машине).
+define('DATA_DIR', getenv('ENOTIS_DATA') ?: ROOT_DIR . '/data');
 
 require APP_DIR . '/helpers.php';
 require APP_DIR . '/db.php';
+require APP_DIR . '/images.php';
+require APP_DIR . '/content.php';
+require APP_DIR . '/social.php';
+require APP_DIR . '/import.php';
+require APP_DIR . '/demo.php';
 require APP_DIR . '/router.php';
