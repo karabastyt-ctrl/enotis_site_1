@@ -53,7 +53,7 @@ return [
     'req.purpose_default'        => 'Donation',
     'service.by'                 => 'Service provided by:',
     'service.price_free'         => 'by arrangement',
-    'wine.type'                  => '{sweet} {color}',
+    'wine.type'                  => '{sweet}, {color}',
     'wine.sweet.dry'             => 'dry',
     'wine.sweet.semidry'         => 'semi-dry',
     'wine.sweet.semisweet'       => 'semi-sweet',

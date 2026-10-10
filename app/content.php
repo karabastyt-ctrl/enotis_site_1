@@ -311,19 +311,35 @@ function money(float $price): string
     return setting('currency') === 'USD' ? $sym . $num : $num . "\u{00A0}" . $sym;
 }
 
-/** Строка вина: «Сухое белое · Ркацители · 2019» (раздел 5.5); пустые части пропускаются. */
-function wine_line(array $w): string
+/** Тип вина: «полусухое, красное» (раздел 5.5). */
+function wine_type(array $w): string
 {
-    $type = trim(strtr(t('wine.type'), [
+    $type = strtr(t('wine.type'), [
         '{sweet}' => $w['wine_sweet'] ? t('wine.sweet.' . $w['wine_sweet']) : '',
         '{color}' => $w['wine_color'] ? t('wine.color.' . $w['wine_color']) : '',
-    ]));
-    $type = preg_replace('/\s+/u', ' ', $type);
-    if ($type !== '') {
-        $type = mb_strtoupper(mb_substr($type, 0, 1)) . mb_substr($type, 1);
+    ]);
+    // Пустая часть не оставляет висящей запятой.
+    return trim(preg_replace(['/\s*,\s*(,\s*)*/u', '/\s+/u'], [', ', ' '], $type), " ,");
+}
+
+/**
+ * Строки карточки вина под названием, каждая своей строкой (раздел 5.5):
+ * части подписи через «·» (страна, хозяйство), «сладость, цвет», сорт, год. Пустые пропускаются.
+ */
+function wine_facts(array $w): array
+{
+    $lines = [];
+    foreach (preg_split('/\s*·\s*/u', (string) $w['subtitle']) as $part) {
+        if ($part !== '') {
+            $lines[] = ['sub', $part];
+        }
     }
-    $parts = array_filter([$type, $w['grape'] ?? null, $w['vintage'] ? (string) $w['vintage'] : null]);
-    return implode(' · ', $parts);
+    foreach (['type' => wine_type($w), 'grape' => $w['grape'] ?? '', 'year' => $w['vintage'] ? (string) $w['vintage'] : ''] as $k => $v) {
+        if ($v !== '') {
+            $lines[] = [$k, $v];
+        }
+    }
+    return $lines;
 }
 
 function show_prices(): bool

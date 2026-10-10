@@ -54,7 +54,7 @@ return [
     'req.purpose_default'        => 'Пожертвование',
     'service.by'                 => 'Услугу оказывает:',
     'service.price_free'         => 'по договорённости',
-    'wine.type'                  => '{sweet} {color}',
+    'wine.type'                  => '{sweet}, {color}',
     'wine.sweet.dry'             => 'сухое',
     'wine.sweet.semidry'         => 'полусухое',
     'wine.sweet.semisweet'       => 'полусладкое',

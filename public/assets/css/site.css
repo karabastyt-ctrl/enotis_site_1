@@ -95,11 +95,17 @@ a.card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
   color: var(--c-action); border: 1.5px solid var(--c-action); }
 .tiles--compact .card__title { font-size: 17px; }
 .card--wine .card__title { font-size: 17px; }
-.wine__line { font-size: 13px; color: var(--c-mute); }
+/* Вино: каждое свойство своей строкой — страна, хозяйство (капителью), тип, сорт, год (раздел 5.5) */
+.wine__sub, .wine__type, .wine__grape, .wine__year { display: block; font-size: 13px; line-height: 1.4; color: var(--c-mute); margin: 0; }
+.wine__sub { font-variant: small-caps; letter-spacing: .04em; }
+.wine__type { color: var(--c-ink); font-weight: 500; }
+.wine__facts { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 16px; }
+.wine__facts > * { font-size: 15px; }
 /* Вина: текст на всю ширину сразу под фото; цена и «+» одной строкой по низу — ровно во всём ряду.
    Тень у бутылки ставит фотосервис (раздел 10.6). */
 .card--wine .card__plate { position: relative; align-items: flex-start; }
-.card--wine .card__text { gap: 3px; }
+.card--wine .card__text { gap: 2px; }
+.card--wine .card__title { margin-bottom: 4px; }
 .card--wine .card__plate:has(.price, .card__icon) .card__text { padding-bottom: 44px; }
 .card--wine .price { position: absolute; left: 18px; bottom: 18px; line-height: 34px; }
 .card--wine .card__icon { position: absolute; right: 18px; bottom: 18px; }

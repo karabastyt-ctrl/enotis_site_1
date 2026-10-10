@@ -53,7 +53,7 @@ return [
     'req.purpose_default'        => 'Don',
     'service.by'                 => 'Service assuré par :',
     'service.price_free'         => 'sur demande',
-    'wine.type'                  => '{color} {sweet}',
+    'wine.type'                  => '{color}, {sweet}',
     'wine.sweet.dry'             => 'sec',
     'wine.sweet.semidry'         => 'demi-sec',
     'wine.sweet.semisweet'       => 'moelleux',

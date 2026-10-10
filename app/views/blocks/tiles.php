@@ -28,11 +28,10 @@ $sizes = $size === 'large' ? '(min-width: 1024px) 360px, (min-width: 600px) 50vw
         <span class="card__plate">
           <span class="card__text">
             <span class="card__title"><?= e($t['title']) ?></span>
-<?php if ($t['subtitle']): ?>
-            <span class="card__sub<?= $wine ? ' smallcaps' : '' ?>"><?= e($t['subtitle']) ?></span>
-<?php endif ?>
-<?php if ($wine && ($line = wine_line($t))): ?>
-            <span class="wine__line"><?= e($line) ?></span>
+<?php if ($wine): ?>
+            <?= view('wine_facts', ['t' => $t, 'tag' => 'span']) ?>
+<?php elseif ($t['subtitle']): ?>
+            <span class="card__sub"><?= e($t['subtitle']) ?></span>
 <?php endif ?>
 <?php if ($wine && show_prices() && $t['price'] !== null): ?>
             <span class="price"><?= e(money((float) $t['price'])) ?></span>

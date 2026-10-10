@@ -53,7 +53,7 @@ return [
     'req.purpose_default'        => 'შემოწირულობა',
     'service.by'                 => 'მომსახურებას გასწევს:',
     'service.price_free'         => 'შეთანხმებით',
-    'wine.type'                  => '{sweet} {color}',
+    'wine.type'                  => '{sweet}, {color}',
     'wine.sweet.dry'             => 'მშრალი',
     'wine.sweet.semidry'         => 'ნახევრად მშრალი',
     'wine.sweet.semisweet'       => 'ნახევრად ტკბილი',

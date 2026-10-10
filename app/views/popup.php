@@ -17,11 +17,10 @@ $hid = 'pp-title-' . $t['id'];
       <div class="pp__photo frame frame--4x5 frame--wine"><?= view('bottle') ?></div>
 <?php endif ?>
       <h2 id="<?= $hid ?>"><?= e($t['title']) ?></h2>
-<?php if ($t['subtitle']): ?>
-      <p class="pp__sub<?= $wine ? ' smallcaps' : '' ?>"><?= e($t['subtitle']) ?></p>
-<?php endif ?>
-<?php if ($wine && ($line = wine_line($t))): ?>
-      <p class="wine__line"><?= e($line) ?></p>
+<?php if ($wine): ?>
+      <div class="wine__facts"><?= view('wine_facts', ['t' => $t, 'tag' => 'p']) ?></div>
+<?php elseif ($t['subtitle']): ?>
+      <p class="pp__sub"><?= e($t['subtitle']) ?></p>
 <?php endif ?>
 <?php foreach (paragraphs($t['body']) as $p): ?>
       <p><?= e($p) ?></p>
