@@ -1,6 +1,6 @@
-/data/*.db
-/data/*.db-*
-/data/backups/
+/data/*
+!/data/.gitkeep
+!/data/.htaccess
 /public/uploads/*
 !/public/uploads/.gitkeep
 .DS_Store

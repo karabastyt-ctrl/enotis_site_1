@@ -1,10 +1,41 @@
-/* Переменные темы. Размеры текста блоков (спецификация 2.0, раздел 5.2) появятся на этапе 3. */
+/* Тема сайта: палитра Б2.1 (спецификация 2.1, раздел 9.1).
+   Цвет даётся роли, а не элементу. Другая гамма для клиента — правим только этот блок :root. */
 :root {
-  --color-bg: #faf8f5;
-  --color-text: #1f1b16;
-  --color-muted: #6b6259;
-  --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Действие: «Поддержать», «Пожертвовать», «Заказать», первая кнопка оплаты, цена, первая буква h1/h2 */
+  --c-action:       #6E2230;
+  --c-action-hover: #561924;
+  --c-on-action:    #FBF8F4;
+
+  /* Навигация и подсказки: бейдж таба, активный таб, метки, «На карте», текущий язык, фокус */
+  --c-nav:          #213A2E;
+  --c-nav-soft:     #E3E9E4;
+
+  /* Основа */
+  --c-bg:           #F4EDE6;
+  --c-paper:        #FBF8F4;
+  --c-line:         #E5DCD2;
+  --c-ink:          #2B2624;
+  --c-mute:         #6D6460;
+
+  /* Вино: только зона фото в карточке и поп-апе вина */
+  --c-wine-bg:      #EAE0D2;
+
+  /* Фокус: бутылочная рамка + мягкий ореол */
+  --focus-ring:     0 0 0 2px var(--c-nav), 0 0 0 5px var(--c-nav-soft);
+
+  /* Шрифты. Файлы (свой сервер) и грузинские Noto по unicode-range подключаются на этапе 3. */
+  --font-head: "Playfair Display", "Noto Serif Georgian", Georgia, "Times New Roman", serif;
+  --font-body: "Golos Text", "Noto Sans Georgian", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Размеры и отступы */
+  --radius:   12px;
+  --gap:      24px;
+  --page-max: 1120px;
 }
-body { margin: 0; background: var(--color-bg); color: var(--color-text); font-family: var(--font-body); }
-.page { max-width: 960px; margin: 0 auto; padding: 48px 16px; }
+
+body { margin: 0; background: var(--c-bg); color: var(--c-ink); font-family: var(--font-body); line-height: 1.5; }
+h1, h2, h3 { font-family: var(--font-head); font-weight: 500; line-height: 1.2; }
+h1::first-letter, h2::first-letter { color: var(--c-action); }
+.page { max-width: var(--page-max); margin: 0 auto; padding: 48px 16px; }
 a { color: inherit; }
+:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 4px; }

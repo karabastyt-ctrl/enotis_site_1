@@ -1,0 +1,38 @@
+/* Тема админки «Графит» + сливовый (спецификация 2.1, раздел 10.2).
+   Свои цвета, не цвета сайта. Правило ролей то же, что на сайте. */
+:root {
+  /* Действие: «Сохранить», «+ Добавить блок», «Применить», включённый тумблер, активное поле */
+  --c-action:       #5B3A63;
+  --c-action-hover: #4A2F51;
+  --c-action-halo:  #ECE3EE;
+  --c-on-action:    #FFFFFF;
+
+  /* Успех: только «Сохранено», «Опубликовано», «Готово» */
+  --c-success:      #3F7A55;
+
+  /* Внимание: только «Есть несохранённые изменения» и предупреждения */
+  --c-warn:         #B98A1E;
+  --c-warn-bg:      #FBF1D9;
+  --c-warn-ink:     #7A5A0E;
+
+  /* Ошибка и удаление */
+  --c-error:        #B3261E;
+  --c-error-bg:     #FBE5E3;
+  --c-error-ink:    #8E1F18;
+
+  /* Основа */
+  --c-bg:           #F6F5F3;
+  --c-tree:         #F1EFEB;
+  --c-paper:        #FFFFFF;
+  --c-line:         #E7E4DF;
+  --c-ink:          #1F1E1C;
+  --c-mute:         #77736D;
+
+  --focus-ring:     0 0 0 2px var(--c-action), 0 0 0 5px var(--c-action-halo);
+
+  /* Только Golos Text (и Noto Sans Georgian для грузинского) */
+  --font-body: "Golos Text", "Noto Sans Georgian", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body { margin: 0; background: var(--c-bg); color: var(--c-ink); font-family: var(--font-body); }
+:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 4px; }
