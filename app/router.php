@@ -15,12 +15,20 @@ function route(string $uri): void
     try {
         db();
         demo_autoload();
-        current_lang(default_lang());
+        // Админка — до выбора языка сайта: превью само решает, какие языки включены в правке.
+        $admin = $path === '/admin' || str_starts_with($path, '/admin/');
+        if (!$admin) {
+            current_lang(default_lang());
+        }
     } catch (Throwable $ex) {
         error_log('[db] ' . $ex->getMessage());
         http_response_code(503);
         header('Retry-After: 60');
         echo view('updating');
+        return;
+    }
+    if ($admin) {
+        admin_route($path);
         return;
     }
 

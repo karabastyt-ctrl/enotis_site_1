@@ -19,7 +19,7 @@ $burger = match (setting('header_burger', 'auto')) {
 $here = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $plain = preg_replace('~^/(' . implode('|', LANGS) . ')(?=/|$)~', '', $here) ?: '/';
 ?>
-<header class="hdr" data-header>
+<header class="hdr" data-header<?= eid('header') ?>>
   <div class="hdr__in">
 <?php if ($back): ?>
     <a class="hdr__back" href="<?= e($back) ?>"><?= e(t('nav.back')) ?></a>

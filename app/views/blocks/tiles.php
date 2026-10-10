@@ -7,7 +7,7 @@ $GLOBALS['eager'] ??= 3;
 $sizes = $size === 'large' ? '(min-width: 1024px) 360px, (min-width: 600px) 50vw, 100vw'
                            : '(min-width: 1024px) 270px, (min-width: 600px) 33vw, 50vw';
 ?>
-<section class="wrap blk tiles tiles--<?= e($size) ?><?= $wine ? ' tiles--wine' : '' ?>">
+<section class="wrap blk tiles tiles--<?= e($size) ?><?= $wine ? ' tiles--wine' : '' ?>"<?= eid($b['id']) ?>>
 <?php if ($b['title']): ?>
   <h2 class="tiles__h"><?= e($b['title']) ?></h2>
 <?php endif ?>
@@ -18,7 +18,7 @@ $sizes = $size === 'large' ? '(min-width: 1024px) 360px, (min-width: 600px) 50vw
     $tag = $opens ? 'a' : 'div';
     $attr = $opens ? ' href="' . e(tile_url($t)) . '"' . ($opens === 'popup' ? ' data-popup-link="' . e($t['slug']) . '"' : '') : '';
 ?>
-    <li>
+    <li<?= eid($t['id']) ?>>
       <<?= $tag ?> class="card<?= $wine ? ' card--wine' : '' ?>"<?= $attr ?>>
 <?php if ($t['photo']): ?>
         <span class="frame frame--<?= $frame ?><?= $wine ? ' frame--wine' : '' ?>"><?= photo_img($t['photo'], $t['title'], $lazy, false, $sizes) ?></span>

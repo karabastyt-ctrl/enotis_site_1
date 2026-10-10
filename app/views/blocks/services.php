@@ -1,6 +1,6 @@
 <section class="wrap blk services<?= count($group) > 1 ? ' services--grid' : '' ?>">
 <?php foreach ($group as $s): ?>
-  <article class="svc">
+  <article class="svc"<?= eid($s['id']) ?>>
     <h2><?= e($s['title']) ?></h2>
 <?php   foreach (paragraphs($s['body']) as $p): ?>
     <p><?= e($p) ?></p>

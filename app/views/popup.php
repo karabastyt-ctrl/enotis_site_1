@@ -10,7 +10,7 @@ $hid = 'pp-title-' . $t['id'];
       <span class="pp__name" aria-hidden="true"><?= e($t['title']) ?></span>
       <a class="pp__x" href="<?= e($pageUrl) ?>" data-close aria-label="<?= e(t('popup.close')) ?>">×</a>
     </div>
-    <div class="pp__body">
+    <div class="pp__body"<?= eid($t['id']) ?>>
 <?php if ($t['photo']): ?>
       <div class="pp__photo frame frame--<?= $frame ?><?= $wine ? ' frame--wine' : '' ?>"><?= photo_img($t['photo'], $t['title'], !$isOpen, false, '(min-width: 700px) 640px, 100vw') ?></div>
 <?php elseif ($wine): ?>
