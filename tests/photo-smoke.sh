@@ -7,8 +7,8 @@ csrf_form() { curl -fsS -b "$1" -c "$1" "$B$2" | grep -o 'name="csrf" value="[^"
 jget() { php -r '$j=json_decode(file_get_contents($argv[1]),true); foreach(explode(".",$argv[2]) as $k) $j=$j[$k]??null; echo is_bool($j)?($j?"true":"false"):(is_array($j)?json_encode($j):$j);' "$1" "$2"; }
 
 J=$(mktemp)
-T=$(csrf_form "$J" /admin)
-curl -fsS -b "$J" -c "$J" -o /dev/null -d "csrf=$T&login=admin&email=admin@example.com&password=correct-horse&password2=correct-horse" "$B/admin/setup"
+T=$(curl -fsS -b "$J" -c "$J" "$B/admin/install" | grep -o 'name="csrf" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
+curl -fsS -b "$J" -c "$J" -o /dev/null -d "csrf=$T&site_title=Test&site_lang=ru&ui_lang=ru&login=admin&email=admin@example.com&password=correct-horse&password2=correct-horse" "$B/admin/install"
 CS=$(curl -fsS -b "$J" "$B/admin" | grep -o '"csrf":"[^"]*"' | head -1 | sed 's/"csrf":"//;s/"//')
 post() { curl -fsS -b "$J" -H "X-CSRF: $CS" -H 'Content-Type: application/json' --data "$2" "$B/admin/api/$1"; }
 

@@ -34,8 +34,8 @@ has 'Sitemap: http[s]*://obiteli.site/sitemap.xml' /tmp/tabs-robots.txt
 
 # Выгрузка ZIP и загрузка обратно: сайт тот же, личных данных в архиве нет.
 J=$(mktemp)
-T=$(curl -fsS -b "$J" -c "$J" "$B/admin" | grep -o 'name="csrf" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
-curl -fsS -b "$J" -c "$J" -o /dev/null -d "csrf=$T&login=admin&email=secret@example.com&password=correct-horse&password2=correct-horse" "$B/admin/setup"
+T=$(curl -fsS -b "$J" -c "$J" "$B/admin/install" | grep -o 'name="csrf" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
+curl -fsS -b "$J" -c "$J" -o /dev/null -d "csrf=$T&site_title=Test&site_lang=ru&ui_lang=ru&login=admin&email=secret@example.com&password=correct-horse&password2=correct-horse" "$B/admin/install"
 CS=$(curl -fsS -b "$J" "$B/admin" | grep -o '"csrf":"[^"]*"' | head -1 | sed 's/"csrf":"//;s/"//')
 BEFORE=$(curl -fsS "$B/gruziya" | sed -E 's#[0-9]+#N#g' | md5sum)   # id после загрузки другие
 curl -fsS -b "$J" -o /tmp/tabs-site.zip "$B/admin/api/export"

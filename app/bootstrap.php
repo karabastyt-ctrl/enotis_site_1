@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const ENGINE_VERSION = '0.7.0';
+const ENGINE_VERSION = '0.8.0';
 const APP_DIR  = __DIR__;
 define('ROOT_DIR', dirname(__DIR__));
 // ENOTIS_DATA — другая папка данных (проверки в CI, вторая копия сайта на одной машине).
@@ -12,6 +12,8 @@ require APP_DIR . '/db.php';
 require APP_DIR . '/images.php';
 require APP_DIR . '/photo_service.php';
 require APP_DIR . '/backup.php';
+require APP_DIR . '/update.php';
+require APP_DIR . '/install.php';
 require APP_DIR . '/brand.php';
 require APP_DIR . '/mail.php';
 require APP_DIR . '/content.php';

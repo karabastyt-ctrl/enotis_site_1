@@ -165,6 +165,7 @@
       reindex();
       renderAll();
       schedulePreview(0);
+      api('GET', 'update').then(function (u) { S.upd = u; renderUpbar(); }).catch(function () {});
     });
   }
 
@@ -238,7 +239,7 @@
     root.appendChild(home);
     root.appendChild(fixedRow('footer', t('tree.footer'), t('tree.all_pages')));
     var set = h('div', { class: 'grp' }, [h('div', { class: 'grp__h' }, [h('span', { text: t('tree.settings') })])]);
-    ['main', 'design', 'langs', 'domains', 'operators', 'docs', 'social', 'mail', 'backups', 'transfer', 'advanced'].forEach(function (k) {
+    ['main', 'design', 'langs', 'domains', 'operators', 'docs', 'social', 'mail', 'backups', 'transfer', 'advanced', 'update'].forEach(function (k) {
       set.appendChild(fixedRow('set:' + k, t('set.' + k), ''));
     });
     root.appendChild(set);
@@ -1135,7 +1136,8 @@
     design: function (root) { formDesign(root); },
     mail: function (root) { formMail(root); },
     backups: function (root) { formBackups(root); },
-    advanced: function (root) { formAdvanced(root); }
+    advanced: function (root) { formAdvanced(root); },
+    update: function (root) { formUpdate(root); }
   };
 
   /* ---------------------------------------------------------------- настройки установки: почта, счётчик (не выгружаются) */
@@ -1379,6 +1381,105 @@
     f.appendChild(h('p', { class: 'hint' }, [t('hint.photo_service') + ' ', h('a', { href: P.photo_service === 'photoroom' ? 'https://app.photoroom.com/api-dashboard' : 'https://claid.ai/', target: '_blank', rel: 'noopener', text: P.photo_service === 'photoroom' ? 'photoroom.com' : 'claid.ai' })]));
     root.appendChild(f);
     function formAdvancedRedraw() { root.innerHTML = ''; formAdvanced(root); }
+  }
+
+  /* ---------------------------------------------------------------- Обновление (раздел 10.12) */
+
+  function notesOf(u) {
+    var n = u && u.notes ? (u.notes[BOOT.ui] && u.notes[BOOT.ui].length ? u.notes[BOOT.ui] : u.notes.ru || []) : [];
+    return Array.isArray(n) ? n : [];
+  }
+
+  // Полоса под верхней панелью: «Доступна версия X · Что нового · Обновить».
+  function renderUpbar() {
+    var bar = $('[data-upbar]');
+    bar.innerHTML = '';
+    var u = S.upd;
+    if (!u || !u.newer) return;
+    bar.appendChild(h('span', { text: t('update.available', { v: u.latest }) }));
+    bar.appendChild(h('button', { type: 'button', class: 'linkbtn', text: t('update.whats_new'), onclick: function () { select('set:update'); } }));
+    bar.appendChild(h('button', { type: 'button', class: 'btn btn--action btn--small', text: t('update.run'), onclick: function () { select('set:update'); runUpdate(); } }));
+  }
+
+  function formUpdate(root) {
+    formHead(root, t('set.update'), t('tree.settings'));
+    var f = h('div', { class: 'fbody' });
+    var u = S.upd || {};
+    f.appendChild(h('div', { class: 'upd__ver' }, [
+      h('span', { class: 'muted', text: t('update.current') }), h('b', { text: u.current || BOOT.engine || '—' }),
+      h('span', { class: 'muted', text: t('update.latest') }), h('b', { text: u.latest || t('update.unknown') })
+    ]));
+    var notes = notesOf(u);
+    if (u.newer && notes.length) {
+      f.appendChild(h('b', { text: t('update.whats_new') }));
+      f.appendChild(h('ul', { class: 'upd__notes' }, notes.map(function (n) { return h('li', { text: n }); })));
+    }
+    if (!u.newer && u.latest) f.appendChild(h('p', { class: 'hint', text: t('update.uptodate') }));
+    var acts = h('div', { class: 'upd__acts' }, [
+      h('button', { type: 'button', class: 'btn btn--ghost', text: t('update.check'), onclick: function (e) {
+        e.currentTarget.disabled = true;
+        api('POST', 'update_check').then(function (j) { S.upd = j; renderUpbar(); renderForm(); }).catch(function () { renderForm(); });
+      } }),
+      u.newer && u.writable ? h('button', { type: 'button', class: 'btn btn--action', text: t('update.run'), onclick: runUpdate }) : null
+    ]);
+    f.appendChild(acts);
+    if (u.newer && !u.writable) {
+      f.appendChild(h('p', { class: 'hint hint--warn' }, [t('update.manual') + ' ', u.zip ? h('a', { href: u.zip, text: t('update.download_zip') }) : null]));
+    }
+    f.appendChild(h('div', { 'data-upd-steps': '' }));
+    if (u.rollback) {
+      f.appendChild(section(t('update.rollback_title')));
+      f.appendChild(h('button', { type: 'button', class: 'btn btn--ghost', text: t('update.rollback', { v: u.rollback }), onclick: function () {
+        confirmBox(t('update.rollback', { v: u.rollback }), t('update.rollback_hint'), t('update.rollback_ok'), true).then(function (ok) {
+          if (!ok) return;
+          setBusy(t('update.rolling_back'));
+          api('POST', 'update_rollback').then(function (j) {
+            setBusy(null);
+            if (!j.ok) { alertBox(t(j.error || 'update.failed')); return; }
+            location.reload();
+          }).catch(function () { setBusy(null); location.reload(); });
+        });
+      } }));
+    }
+    root.appendChild(f);
+  }
+
+  var UPD_STEPS = ['prepare', 'download', 'replace', 'finish'];
+
+  // «Обновить»: шаги отдельными запросами, прогресс — списком; ошибка — сервер уже откатил.
+  function runUpdate() {
+    if (S.dirty) { alertBox(t('update.save_first')); return; }
+    confirmBox(t('update.confirm_title', { v: S.upd.latest }), t('update.confirm'), t('update.run'), false).then(function (ok) {
+      if (!ok) return;
+      var box = $('[data-upd-steps]');
+      var list = h('ol', { class: 'upd__steps' }, UPD_STEPS.map(function (s) { return h('li', { 'data-s': s, text: t('update.step.' + s) }); }));
+      if (box) { box.innerHTML = ''; box.appendChild(list); }
+      setBusy(t('update.running'));
+      function mark(i) {
+        Array.prototype.forEach.call(list.children, function (li, k) { li.className = k < i ? 'is-done' : (k === i ? 'is-now' : ''); });
+      }
+      function step(i) {
+        mark(i);
+        api('POST', 'update_step', { step: UPD_STEPS[i] }).then(function (j) {
+          if (!j.ok) {
+            setBusy(null);
+            alertBox(t(j.error || 'update.failed') + (j.rolled_back ? ' ' + t('update.rolled_back') : ''));
+            api('GET', 'update').then(function (u) { S.upd = u; renderUpbar(); renderForm(); });
+            return;
+          }
+          if (j.next) { step(UPD_STEPS.indexOf(j.next)); return; }
+          mark(UPD_STEPS.length);
+          setBusy(null);
+          flash(t('update.done', { v: j.version }), 'ok');
+          setTimeout(function () { location.reload(); }, 1200);
+        }).catch(function () {
+          setBusy(null);
+          alertBox(t('update.failed') + ' ' + t('update.rolled_back'));
+          setTimeout(function () { location.reload(); }, 1500);
+        });
+      }
+      step(0);
+    });
   }
 
   /* ---------------------------------------------------------------- Перед запуском (раздел 10.13) */

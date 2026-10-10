@@ -7,8 +7,8 @@ J=$(mktemp)
 csrf() { curl -fsS -b "$J" -c "$J" "$B/admin" | grep -o 'name="csrf" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//'; }
 
 # Новая установка: создаём вход.
-T=$(csrf)
-curl -fsS -b "$J" -c "$J" -o /dev/null -d "csrf=$T&login=admin&email=a@example.com&password=correct-horse&password2=correct-horse" "$B/admin/setup"
+T=$(curl -fsS -b "$J" -c "$J" "$B/admin/install" | grep -o 'name="csrf" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
+curl -fsS -b "$J" -c "$J" -o /dev/null -d "csrf=$T&site_title=Test&site_lang=ru&ui_lang=ru&login=admin&email=a@example.com&password=correct-horse&password2=correct-horse" "$B/admin/install"
 curl -fsS -b "$J" -c "$J" -o /tmp/admin-boot.html "$B/admin"
 grep -q 'id="boot"' /tmp/admin-boot.html
 
@@ -40,7 +40,7 @@ grep -q 'data-eid=' /tmp/admin-prev.html
 
 # Неверный пароль не пускает; выход закрывает сессию.
 K=$(mktemp); T=$(curl -fsS -c "$K" "$B/admin" | grep -o 'name="csrf" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
-curl -fsS -b "$K" -c "$K" -d "csrf=$T&login=admin&password=wrong" -o /tmp/admin-login.html "$B/admin/login"
+curl -fsS -b "$K" -c "$K" -d "csrf=$T&site_title=Test&site_lang=ru&ui_lang=ru&login=admin&password=wrong" -o /tmp/admin-login.html "$B/admin/login"
 grep -q 'role="alert"' /tmp/admin-login.html
 curl -fsS -b "$J" -c "$J" -o /dev/null -d "csrf=$CS" "$B/admin/logout" || true
 test "$(curl -s -o /dev/null -w '%{http_code}' -b "$J" "$B/admin/api/site")" = 401

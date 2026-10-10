@@ -1,0 +1,6 @@
+{
+  "ru": ["Мастер установки /install", "Кнопка «Обновить» и откат к прежней версии", "Фотосервис: «Студийное фото» и «Улучшить»"],
+  "ka": ["დაყენების ოსტატი /install", "ღილაკი „განახლება“ და წინა ვერსიაზე დაბრუნება", "ფოტოსერვისი: „სტუდიური ფოტო“ და „გაუმჯობესება“"],
+  "en": ["Installation wizard /install", "“Update” button and rollback", "Photo service: “Studio photo” and “Enhance”"],
+  "fr": ["Assistant d’installation /install", "Bouton « Mettre à jour » et retour arrière", "Service photo : « Photo studio » et « Améliorer »"]
+}

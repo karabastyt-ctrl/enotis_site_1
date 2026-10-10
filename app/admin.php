@@ -22,12 +22,13 @@ function admin_route(string $path): void
     // Аварийный сброс без почты: data/reset-password.txt (раздел 10.10).
     $notice = admin_reset_from_file();
 
+    // Чистая установка: вход создаёт мастер /install (раздел 14.1).
+    if ($path === '/admin/install') {
+        install_route();
+        return;
+    }
     if (!admin_exists()) {
-        if ($method === 'POST' && $path === '/admin/setup') {
-            admin_setup();
-            return;
-        }
-        echo admin_page('admin/setup', ['error' => null]);
+        str_starts_with($path, '/admin/api/') ? admin_json(['error' => 'auth'], 401) : admin_redirect('/admin/install');
         return;
     }
 
@@ -181,33 +182,6 @@ function admin_sign_in(array $a): void
     $_SESSION['csrf'] = bin2hex(random_bytes(16));
 }
 
-/** Первый вход на чистой установке: создать логин и пароль. Позже это сделает мастер установки (этап 8). */
-function admin_setup(): void
-{
-    admin_check_csrf($_POST['csrf'] ?? '');
-    $lang = admin_lang();
-    $login = trim((string) ($_POST['login'] ?? ''));
-    $email = trim((string) ($_POST['email'] ?? ''));
-    $p1 = (string) ($_POST['password'] ?? '');
-    $p2 = (string) ($_POST['password2'] ?? '');
-    $error = admin_password_error($p1, $p2, $lang);
-    if ($login === '' || mb_strlen($login) > 60) {
-        $error = ta('setup.login_required', $lang);
-    } elseif ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = ta('profile.email_bad', $lang);
-    }
-    if ($error) {
-        echo admin_page('admin/setup', ['error' => $error]);
-        return;
-    }
-    db()->prepare('INSERT INTO admins (login, password_hash, email, ui_lang) VALUES (?, ?, ?, ?)')
-        ->execute([$login, password_hash($p1, PASSWORD_DEFAULT), $email ?: null, $lang]);
-    $st = db()->prepare('SELECT * FROM admins WHERE login = ?');
-    $st->execute([$login]);
-    admin_sign_in($st->fetch());
-    admin_redirect('/admin');
-}
-
 function admin_password_error(string $p1, string $p2, string $lang): ?string
 {
     if (mb_strlen($p1) < 8) {
@@ -300,6 +274,18 @@ function admin_api(string $name, string $method, array $admin): void
             return;
         case 'GET original':
             admin_original((int) ($_GET['id'] ?? 0), (string) ($_GET['src'] ?? ''));
+            return;
+        case 'GET update':
+            admin_json(update_status(false));
+            return;
+        case 'POST update_check':
+            admin_json(update_status(true));
+            return;
+        case 'POST update_step':
+            admin_json(update_step((string) (admin_input()['step'] ?? '')));
+            return;
+        case 'POST update_rollback':
+            admin_json(update_rollback());
             return;
         case 'POST photo_process':
             $in = admin_input();
