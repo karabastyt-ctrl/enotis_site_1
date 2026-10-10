@@ -35,6 +35,15 @@ function admin_route(string $path): void
         admin_login();
         return;
     }
+    // «Забыли пароль?» (раздел 10.10).
+    if ($path === '/admin/forgot') {
+        $method === 'POST' ? admin_forgot() : print(admin_page('admin/forgot', ['error' => null, 'notice' => null]));
+        return;
+    }
+    if ($path === '/admin/reset') {
+        admin_reset($method);
+        return;
+    }
     if ($path === '/admin/logout' && $method === 'POST') {
         admin_check_csrf($_POST['csrf'] ?? '');
         $_SESSION = [];
@@ -261,7 +270,24 @@ function admin_api(string $name, string $method, array $admin): void
 {
     switch ("$method $name") {
         case 'GET site':
-            admin_json(['site' => site_export(), 'meta' => admin_meta()]);
+            admin_json(['site' => site_export(), 'meta' => admin_meta(), 'private' => admin_private()]);
+            return;
+        case 'POST brand':
+            admin_brand_upload();
+            return;
+        case 'POST mail_test':
+            admin_mail_test($admin, admin_input());
+            return;
+        case 'GET backups':
+            admin_json(['list' => backup_list()]);
+            return;
+        case 'POST backup_now':
+            backup_now('manual');
+            admin_json(['ok' => true, 'list' => backup_list()]);
+            return;
+        case 'POST backup_restore':
+            $err = backup_restore((string) (admin_input()['name'] ?? ''));
+            admin_json($err ? ['ok' => false, 'error' => $err] : ['ok' => true, 'list' => backup_list()], $err ? 422 : 200);
             return;
         case 'POST preview':
             admin_preview_store(admin_input());
@@ -324,6 +350,10 @@ function admin_save(array $in): void
         return;
     }
     $check = site_validate($site);
+    $private = is_array($in['private'] ?? null) ? $in['private'] : null;
+    if ($private) {
+        $check['errors'] = array_merge($check['errors'], private_errors($private));
+    }
     if ($check['errors']) {
         admin_json(['ok' => false] + $check, 422);
         return;
@@ -332,6 +362,9 @@ function admin_save(array $in): void
     $pdo->beginTransaction();
     try {
         $ids = site_write($site);
+        if ($private) {
+            private_write($private);
+        }
         // Сайт правят в админке: тестовое наполнение demo/ больше его не перезаписывает.
         $pdo->exec("DELETE FROM settings WHERE key = 'demo_version'");
         $pdo->commit();
@@ -342,7 +375,7 @@ function admin_save(array $in): void
         return;
     }
     setting_reset();
-    admin_json(['ok' => true, 'ids' => (object) $ids, 'warnings' => $check['warnings'], 'site' => site_export()]);
+    admin_json(['ok' => true, 'ids' => (object) $ids, 'warnings' => $check['warnings'], 'site' => site_export(), 'private' => admin_private()]);
 }
 
 /* ---------------------------------------------------------------- выгрузка и загрузка (раздел 13) */
@@ -604,4 +637,186 @@ function admin_profile(array $admin, array $in): void
         session_write_close();
     }
     admin_json(['ok' => true]);
+}
+
+/* ---------------------------------------------------------------- настройки установки (не выгружаются, раздел 13) */
+
+const COUNTER_MAX = 5000;
+
+/** Почта, код счётчика, ручная галочка оплаты. Пароль ящика не отдаётся — только «задан или нет». */
+function admin_private(): array
+{
+    return [
+        'mail_from'        => (string) setting('mail_from', ''),
+        'mail_from_default' => mail_from_default(),
+        'smtp_host'        => (string) setting('smtp_host', ''),
+        'smtp_port'        => (string) setting('smtp_port', ''),
+        'smtp_secure'      => setting('smtp_secure', 'tls') === 'ssl' ? 'ssl' : 'tls',
+        'smtp_user'        => (string) setting('smtp_user', ''),
+        'smtp_pass'        => null,
+        'smtp_pass_set'    => (string) setting('smtp_pass', '') !== '',
+        'mail_test_ok'     => (string) setting('mail_test_ok', ''),
+        'counter_code'     => (string) setting('counter_code', ''),
+        'payment_checked'  => setting('launch_payment_checked') === '1',
+    ];
+}
+
+function private_errors(array $p): array
+{
+    $err = [];
+    $from = trim((string) ($p['mail_from'] ?? ''));
+    if ($from !== '' && !filter_var($from, FILTER_VALIDATE_EMAIL)) {
+        $err[] = ['id' => 'mail', 'field' => 'mail_from', 'code' => 'err.email'];
+    }
+    $port = trim((string) ($p['smtp_port'] ?? ''));
+    if ($port !== '' && (!ctype_digit($port) || (int) $port < 1 || (int) $port > 65535)) {
+        $err[] = ['id' => 'mail', 'field' => 'smtp_port', 'code' => 'err.port'];
+    }
+    if (trim((string) ($p['smtp_host'] ?? '')) !== '' && !preg_match('~^[A-Za-z0-9.-]+$~', trim((string) $p['smtp_host']))) {
+        $err[] = ['id' => 'mail', 'field' => 'smtp_host', 'code' => 'err.host'];
+    }
+    if (mb_strlen((string) ($p['counter_code'] ?? '')) > COUNTER_MAX) {
+        $err[] = ['id' => 'advanced', 'field' => 'counter_code', 'code' => 'err.too_long', 'n' => COUNTER_MAX];
+    }
+    return $err;
+}
+
+function private_write(array $p): void
+{
+    $vals = [
+        'mail_from'   => trim((string) ($p['mail_from'] ?? '')),
+        'smtp_host'   => trim((string) ($p['smtp_host'] ?? '')),
+        'smtp_port'   => trim((string) ($p['smtp_port'] ?? '')),
+        'smtp_secure' => ($p['smtp_secure'] ?? '') === 'ssl' ? 'ssl' : 'tls',
+        'smtp_user'   => trim((string) ($p['smtp_user'] ?? '')),
+        'counter_code' => (string) ($p['counter_code'] ?? ''),
+        'launch_payment_checked' => !empty($p['payment_checked']) ? '1' : '0',
+    ];
+    // Пароль ящика: null — не меняли; пустая строка — стереть.
+    if (array_key_exists('smtp_pass', $p) && $p['smtp_pass'] !== null) {
+        $vals['smtp_pass'] = (string) $p['smtp_pass'];
+    }
+    $before = mail_config();
+    foreach ($vals as $k => $v) {
+        set_setting($k, $v);
+    }
+    // Почту поменяли — прежняя отметка «тестовое письмо дошло» больше не верна.
+    if (mail_config() !== $before) {
+        set_setting('mail_test_ok', null);
+    }
+}
+
+/** «Отправить тестовое письмо» — на почту администратора, с настройками из формы (ещё не сохранёнными). */
+function admin_mail_test(array $admin, array $in): void
+{
+    $lang = admin_lang($admin);
+    if (!$admin['email']) {
+        admin_json(['ok' => false, 'error' => ta('mail.no_admin_email', $lang)], 422);
+        return;
+    }
+    $over = [];
+    foreach (MAIL_KEYS as $k) {
+        if (array_key_exists($k, $in) && $in[$k] !== null) {
+            $over[$k] = (string) $in[$k];
+        }
+    }
+    $err = send_mail($admin['email'], ta('mail.test_subject', $lang), ta('mail.test_body', $lang), $over);
+    if ($err === null && mail_config($over) === mail_config()) {
+        set_setting('mail_test_ok', date('Y-m-d H:i'));
+    }
+    admin_json($err === null ? ['ok' => true, 'to' => $admin['email'], 'saved' => mail_config($over) === mail_config()]
+                             : ['ok' => false, 'error' => $err], $err === null ? 200 : 422);
+}
+
+/* ---------------------------------------------------------------- оформление */
+
+function admin_brand_upload(): void
+{
+    $f = $_FILES['file'] ?? null;
+    $kind = (string) ($_POST['kind'] ?? '');
+    if (!$f || $f['error'] !== UPLOAD_ERR_OK || !isset(BRAND_KEYS[$kind])) {
+        admin_json(['error' => ($f['error'] ?? 0) === UPLOAD_ERR_INI_SIZE ? 'photo.too_big' : 'photo.upload_failed'], 400);
+        return;
+    }
+    if ($f['size'] > UPLOAD_MAX_BYTES) {
+        admin_json(['error' => 'photo.too_big'], 400);
+        return;
+    }
+    $res = brand_store($kind, $f['tmp_name'], (string) $f['name']);
+    admin_json($res, isset($res['url']) ? 200 : 400);
+}
+
+/* ---------------------------------------------------------------- «Забыли пароль?» (раздел 10.10) */
+
+const RESET_PER_HOUR = 3;
+
+function admin_forgot(): void
+{
+    admin_check_csrf($_POST['csrf'] ?? '');
+    $lang = admin_lang();
+    $who = trim((string) ($_POST['login'] ?? ''));
+    $st = db()->prepare('SELECT * FROM admins WHERE login = ? OR (email IS NOT NULL AND email = ?)');
+    $st->execute([$who, $who]);
+    $a = $who !== '' ? $st->fetch() : null;
+    if ($a && $a['email']) {
+        $sent = array_values(array_filter(json_decode((string) $a['reset_sent'], true) ?: [], fn($t) => $t > time() - 3600));
+        if (count($sent) < RESET_PER_HOUR) {
+            $token = bin2hex(random_bytes(32));
+            $sent[] = time();
+            db()->prepare('UPDATE admins SET reset_hash = ?, reset_until = ?, reset_sent = ? WHERE id = ?')
+                ->execute([hash('sha256', $token), date('Y-m-d H:i:s', time() + 3600), json_encode($sent), $a['id']]);
+            $ui = $a['ui_lang'];
+            $link = abs_url('/admin/reset?token=' . $token);
+            $err = send_mail($a['email'], ta('reset.mail_subject', $ui),
+                             str_replace(['{site}', '{link}', '{login}'], [site_title(), $link, $a['login']], ta('reset.mail_body', $ui)));
+            if ($err !== null) {
+                error_log('[mail] reset: ' . $err);
+            }
+        }
+    } else {
+        usleep(300000);
+    }
+    // Ответ всегда одинаковый: по нему нельзя узнать, есть ли такой логин.
+    echo admin_page('admin/forgot', ['error' => null, 'notice' => ta('forgot.sent', $lang)]);
+}
+
+/** Действующая ссылка сброса → запись администратора. */
+function reset_admin(string $token): ?array
+{
+    if (!preg_match('~^[0-9a-f]{64}$~', $token)) {
+        return null;
+    }
+    $st = db()->prepare('SELECT * FROM admins WHERE reset_hash = ?');
+    $st->execute([hash('sha256', $token)]);
+    $a = $st->fetch();
+    return $a && $a['reset_until'] && strtotime($a['reset_until']) > time() ? $a : null;
+}
+
+function admin_reset(string $method): void
+{
+    $lang = admin_lang();
+    $token = (string) ($method === 'POST' ? ($_POST['token'] ?? '') : ($_GET['token'] ?? ''));
+    $a = reset_admin($token);
+    if (!$a) {
+        echo admin_page('admin/forgot', ['error' => ta('reset.invalid', $lang), 'notice' => null]);
+        return;
+    }
+    if ($method !== 'POST') {
+        echo admin_page('admin/reset', ['error' => null, 'token' => $token]);
+        return;
+    }
+    admin_check_csrf($_POST['csrf'] ?? '');
+    $p1 = (string) ($_POST['password'] ?? '');
+    $error = admin_password_error($p1, (string) ($_POST['password2'] ?? ''), $lang);
+    if ($error) {
+        echo admin_page('admin/reset', ['error' => $error, 'token' => $token]);
+        return;
+    }
+    // Ссылка одноразовая; новый хеш пароля закрывает все прежние сессии.
+    $hash = password_hash($p1, PASSWORD_DEFAULT);
+    db()->prepare('UPDATE admins SET password_hash = ?, reset_hash = NULL, reset_until = NULL, failed_count = 0, locked_until = NULL WHERE id = ?')
+        ->execute([$hash, $a['id']]);
+    $a['password_hash'] = $hash;
+    admin_sign_in($a);
+    admin_redirect('/admin');
 }

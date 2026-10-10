@@ -67,6 +67,17 @@ jobs:
           sleep 1
           tests/tabs-smoke.sh http://127.0.0.1:8082
           if grep -E 'PHP (Warning|Notice|Deprecated|Fatal)' /tmp/php-agg.log | grep -v 'JIT'; then exit 1; fi
+      - name: Оформление, почта, пароль, резервные копии
+        env:
+          ENOTIS_DATA: /tmp/enotis-settings
+          ENOTIS_MAIL_FILE: /tmp/enotis-mail.txt
+        run: |
+          mkdir -p "$ENOTIS_DATA"
+          php bin/import.php tests/fixtures/aggregator/site.json
+          php -S 127.0.0.1:8083 -t public public/index.php >/tmp/php-set.log 2>&1 &
+          sleep 1
+          tests/settings-smoke.sh http://127.0.0.1:8083 "$ENOTIS_MAIL_FILE"
+          if grep -E 'PHP (Warning|Notice|Deprecated|Fatal)' /tmp/php-set.log | grep -v 'JIT'; then exit 1; fi
 
   deploy:
     needs: check

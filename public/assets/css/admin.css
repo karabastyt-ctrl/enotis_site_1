@@ -264,3 +264,28 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
 .mbox__choices { display: flex; flex-direction: column; gap: 8px; margin: 16px 0 4px; }
 .mbox__choices .btn { justify-content: flex-start; text-align: left; }
 .mbox__text { white-space: pre-line; }
+
+/* Этап 6: оформление, почта, резервные копии, «Перед запуском» */
+.hint--ok { color: var(--c-success); }
+.ed--small { width: 760px; }
+.ed--small .ed__b { grid-template-columns: minmax(0, 1fr); }
+.brand__row { display: flex; gap: 14px; align-items: center; }
+.brand__img, .brand__none { flex: none; border: 1px solid var(--c-line); border-radius: 8px; background: #F1EFEB; display: grid; place-items: center; color: var(--c-mute); font-size: 12px; object-fit: contain; }
+.brand__img--logo { width: 160px; height: 56px; padding: 6px; background: #fff; }
+.brand__img--icon { width: 64px; height: 64px; }
+.brand__img--og { width: 190px; aspect-ratio: 1200 / 630; object-fit: cover; }
+.more { margin: 4px 0 14px; border: 1px solid var(--c-line); border-radius: 10px; padding: 10px 14px; }
+.more summary { cursor: pointer; font-weight: 600; }
+.more[open] summary { margin-bottom: 10px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
+.bk { display: flex; flex-direction: column; gap: 6px; margin: 14px 0; }
+.bk__row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--c-line); border-radius: 8px; background: var(--c-paper); }
+.bk__d { flex: 1; }
+.bk__tag { font-size: 12px; color: var(--c-mute); background: #F1EFEB; padding: 2px 8px; border-radius: 99px; }
+.chk { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; padding: 10px 12px; margin-bottom: 6px; border: 1px solid var(--c-line); border-radius: 10px; background: var(--c-paper); cursor: pointer; font: inherit; color: inherit; }
+.chk:hover { border-color: var(--c-action); }
+.chk__m { width: 22px; height: 22px; flex: none; border-radius: 50%; display: grid; place-items: center; border: 1.5px solid var(--c-line); color: var(--c-mute); font-size: 12px; }
+.chk.is-ok .chk__m { background: var(--c-success); border-color: var(--c-success); color: #fff; }
+.chk__t { display: flex; flex-direction: column; gap: 2px; }
+.chk__t small { color: var(--c-mute); font-size: 12.5px; }
+.row--ok .row__lb { color: var(--c-success); font-weight: 600; }

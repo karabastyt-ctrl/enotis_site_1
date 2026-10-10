@@ -149,6 +149,10 @@ function site_export(): array
             'maps'            => $set['maps'] ?? 'google',
             'show_prices'     => ($set['show_prices'] ?? '1') === '1',
             'cookie_notice'   => ($set['cookie_notice'] ?? '1') === '1',
+            'logo'            => !empty($set['logo_path'])
+                ? ['url' => '/uploads/' . $set['logo_path'], 'with_title' => ($set['logo_with_title'] ?? '1') === '1'] : null,
+            'favicon'         => !empty($set['favicon_path']) ? ['url' => '/uploads/' . $set['favicon_path']] : null,
+            'og_image'        => !empty($set['og_image_path']) ? ['url' => '/uploads/' . $set['og_image_path']] : null,
         ],
         'header'    => ['show' => ($set['header_show'] ?? '1') === '1', 'burger' => $set['header_burger'] ?? 'auto'],
         'footer'    => ['show' => ($set['footer_show'] ?? '1') === '1', 'email' => (string) ($set['footer_email'] ?? ''),
@@ -578,7 +582,15 @@ function site_write(array $site, array $opts = []): array
         'footer_show'   => ($site['footer']['show'] ?? true) ? '1' : '0',
         'footer_email'  => nn($site['footer']['email'] ?? null),
         'footer_phone'  => nn($site['footer']['phone'] ?? null),
+        // Оформление (раздел 10.5): только свои файлы из public/uploads/brand.
+        'logo_path'       => brand_path($s['logo']['url'] ?? null),
+        'logo_with_title' => ($s['logo']['with_title'] ?? true) ? '1' : '0',
+        'favicon_path'    => brand_path($s['favicon']['url'] ?? null),
+        'og_image_path'   => brand_path($s['og_image']['url'] ?? null),
     ];
+    if ($plain['favicon_path']) {
+        favicon_ensure($plain['favicon_path']);
+    }
     $st = $pdo->prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');
     foreach ($plain as $k => $v) {
         $st->execute([$k, $v]);
