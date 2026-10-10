@@ -1,0 +1,44 @@
+# Релиз движка по тегу vX.Y.Z (спецификация 2.1, раздел 14.2):
+# ZIP кода + latest.json + ZIP «Паломника» → релиз на GitHub и папка update.enotis.ru по FTP.
+# Секреты для сервера обновлений: UPDATE_FTP_HOST, UPDATE_FTP_USER, UPDATE_FTP_PASSWORD, UPDATE_FTP_DIR.
+# Пока их нет, файлы остаются только в релизе на GitHub.
+name: release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: pdo_sqlite, zip
+      - name: Тег совпадает с версией движка
+        run: |
+          v=$(grep -o "ENGINE_VERSION = '[0-9.]*'" app/bootstrap.php | grep -o "[0-9][0-9.]*")
+          test "v$v" = "$GITHUB_REF_NAME" || { echo "Тег $GITHUB_REF_NAME, а в коде $v"; exit 1; }
+      - name: Сборка
+        run: php bin/build-release.php dist
+      - name: Релиз на GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "Энотис $GITHUB_REF_NAME" --notes-file <(php -r '$j=json_decode(file_get_contents("dist/latest.json"),true); foreach($j["notes"]["ru"]??[] as $n) echo "- $n\n";')
+      - name: На сервер обновлений
+        env:
+          HOST: ${{ secrets.UPDATE_FTP_HOST }}
+          USER: ${{ secrets.UPDATE_FTP_USER }}
+          PASS: ${{ secrets.UPDATE_FTP_PASSWORD }}
+          DIR: ${{ secrets.UPDATE_FTP_DIR }}
+        run: |
+          if [ -z "$HOST" ]; then echo "Секретов UPDATE_FTP_* нет — пропускаю"; exit 0; fi
+          # Сначала ZIP, последним latest.json: сайты не увидят версию раньше, чем файл.
+          for f in dist/enotis-*.zip dist/palomnik-site.zip dist/latest.json; do
+            curl -sS --ssl --ftp-create-dirs --user "$USER:$PASS" -T "$f" "ftp://$HOST/${DIR%/}/"
+          done

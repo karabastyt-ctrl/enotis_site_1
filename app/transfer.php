@@ -32,13 +32,13 @@ function export_zip(bool $structure, ?int $tabId): ?string
     }
     $files = [];
     $site['blocks'] = export_files($site['blocks'], $files);
-    foreach (brand_settings() as $key => $dir) {
-        $path = $site['settings'][$key] ?? null;
-        if ($path && !$structure && is_file(PUBLIC_UPLOADS . '/' . $path)) {
-            $files['brand/' . basename($path)] = PUBLIC_UPLOADS . '/' . $path;
-            $site['settings'][$key] = 'brand/' . basename($path);
+    foreach (array_keys(BRAND_KEYS) as $key) {
+        $path = brand_path($site['settings'][$key]['url'] ?? null);
+        if ($path && !$structure) {
+            $files[$path] = PUBLIC_UPLOADS . '/' . $path;
+            $site['settings'][$key]['url'] = $path;
         } else {
-            unset($site['settings'][$key]);
+            $site['settings'][$key] = null;
         }
     }
 
@@ -56,12 +56,6 @@ function export_zip(bool $structure, ?int $tabId): ?string
     }
     $zip->close();
     return $zipFile;
-}
-
-/** Картинки оформления сайта (этап 6): ключ настройки → папка в public/uploads. */
-function brand_settings(): array
-{
-    return ['logo' => 'brand', 'favicon' => 'brand', 'og_image' => 'brand'];
 }
 
 /** Фото и QR дерева → файлы для ZIP; в JSON остаются имя файла и кадр. */
@@ -97,7 +91,8 @@ function export_photo_file(?array $photo, array &$files): ?array
     if (!$photo || !is_int($photo['id'] ?? null)) {
         return null;
     }
-    $st = db()->prepare('SELECT original_path FROM photos WHERE id = ?');
+    // В ZIP — тот файл, что на сайте: обработанный, если выбран он (кадр рассчитан на него).
+    $st = db()->prepare('SELECT CASE WHEN use_processed = 1 AND processed_path IS NOT NULL THEN processed_path ELSE original_path END FROM photos WHERE id = ?');
     $st->execute([$photo['id']]);
     $orig = $st->fetchColumn();
     if (!$orig || !is_file(ORIGINALS_DIR . '/' . $orig)) {
@@ -303,9 +298,12 @@ function import_zip_site(string $zipFile): array
         if ($check['errors']) {
             return ['ok' => false, 'errors' => $check['errors']];
         }
-        foreach (brand_settings() as $key => $sub) {
-            $v = $site['settings'][$key] ?? null;
-            $site['settings'][$key] = is_string($v) && preg_match('~^brand/[A-Za-z0-9._-]+$~', $v) && is_file($dir . '/' . $v) ? $v : null;
+        // Оформление: только файлы, которые есть в архиве (brand/имя).
+        foreach (array_keys(BRAND_KEYS) as $key) {
+            $v = $site['settings'][$key]['url'] ?? null;
+            if (!is_string($v) || !preg_match('~^brand/[A-Za-z0-9._-]+$~', $v) || !is_file($dir . '/' . $v)) {
+                $site['settings'][$key] = null;
+            }
         }
         db_backup(db(), 'import');
         import_images($dir);

@@ -160,11 +160,12 @@
 
   function load() {
     api('GET', 'site').then(function (j) {
-      S.site = j.site; S.meta = j.meta;
+      S.site = j.site; S.meta = j.meta; S.priv = j.private;
       S.lang = mainLang(); S.pvLang = mainLang();
       reindex();
       renderAll();
       schedulePreview(0);
+      api('GET', 'update').then(function (u) { S.upd = u; renderUpbar(); }).catch(function () {});
     });
   }
 
@@ -228,13 +229,17 @@
     var root = $('[data-tree]');
     var keepScroll = root.scrollTop;
     root.innerHTML = '';
+    var L = launchItems(), done = L.filter(function (x) { return x.ok; }).length;
+    var lrow = fixedRow('launch', done === L.length ? '✓ ' + t('launch.ready') : t('launch.title'), done === L.length ? '' : t('launch.count', { n: done, m: L.length }));
+    if (done === L.length) lrow.classList.add('row--ok');
+    root.appendChild(lrow);
     root.appendChild(fixedRow('header', t('tree.header'), t('tree.all_pages')));
     var home = h('div', { class: 'grp' }, [h('div', { class: 'grp__h' }, [h('span', { text: t('tree.home') })])]);
     home.appendChild(blockList(S.site.blocks, null));
     root.appendChild(home);
     root.appendChild(fixedRow('footer', t('tree.footer'), t('tree.all_pages')));
     var set = h('div', { class: 'grp' }, [h('div', { class: 'grp__h' }, [h('span', { text: t('tree.settings') })])]);
-    ['main', 'langs', 'domains', 'operators', 'docs', 'social', 'transfer'].forEach(function (k) {
+    ['main', 'design', 'langs', 'domains', 'operators', 'docs', 'social', 'mail', 'backups', 'transfer', 'advanced', 'update'].forEach(function (k) {
       set.appendChild(fixedRow('set:' + k, t('set.' + k), ''));
     });
     root.appendChild(set);
@@ -511,7 +516,8 @@
     root.innerHTML = '';
     if (S.errors.length || S.warnings.length) root.appendChild(problemList());
     var k = S.sel;
-    if (k === 'header') formHeader(root);
+    if (k === 'launch') formLaunch(root);
+    else if (k === 'header') formHeader(root);
     else if (k === 'footer') formFooter(root);
     else if (k.indexOf('set:') === 0) FORMS_SET[k.slice(4)](root);
     else {
@@ -545,6 +551,7 @@
     if (id === 'operators') return 'set:operators';
     if (id === 'languages') return 'set:langs';
     if (id === 'domains') return 'set:domains';
+    if (id === 'mail' || id === 'advanced' || id === 'design') return 'set:' + id;
     if (typeof id === 'string' && id.indexOf('tab:') === 0) return String(clientId('t' + id.slice(4)));
     return id == null ? '' : String(clientId(id));
   }
@@ -761,7 +768,7 @@
       f.appendChild(seoBox(tl, M));
     },
     wine: function (f, tl, M) {
-      f.appendChild(photoField(tl, 'photo', '4:5'));
+      f.appendChild(photoField(tl, 'photo', '4:5', true));
       f.appendChild(textField(tl, 'title', t('field.name'), M.title));
       f.appendChild(textField(tl, 'subtitle', t('field.wine_subtitle'), M.subtitle, { hint: t('hint.wine_subtitle') }));
       f.appendChild(h('div', { class: 'two' }, [
@@ -1125,8 +1132,421 @@
         if (s.network === 'x') f.appendChild(h('small', { class: 'hint soc__note', text: t('hint.x') }));
       });
       root.appendChild(f);
-    }
+    },
+    design: function (root) { formDesign(root); },
+    mail: function (root) { formMail(root); },
+    backups: function (root) { formBackups(root); },
+    advanced: function (root) { formAdvanced(root); },
+    update: function (root) { formUpdate(root); }
   };
+
+  /* ---------------------------------------------------------------- настройки установки: почта, счётчик (не выгружаются) */
+
+  function privErr(key) {
+    var er = S.errors.filter(function (e) { return (e.id === 'mail' || e.id === 'advanced') && e.field === key; })[0];
+    return er ? t(er.code, { n: er.n }) : null;
+  }
+  function privField(key, label, opts) {
+    opts = opts || {};
+    var input = h('input', { type: opts.type || 'text', placeholder: opts.placeholder || null, autocomplete: opts.ac || 'off', inputmode: opts.inputmode || null, 'data-field': key });
+    input.value = S.priv[key] == null ? '' : S.priv[key];
+    input.addEventListener('input', function () { S.priv[key] = input.value; changed(); if (opts.onInput) opts.onInput(); });
+    return field(label, input, opts.hint, null, privErr(key));
+  }
+
+  /* ---------------------------------------------------------------- Оформление (раздел 10.5) */
+
+  // Загрузка картинки оформления; favicon и картинка для соцсетей сначала кадрируются (Cropper.js).
+  function brandUpload(kind, file) {
+    function send(blob, name) {
+      var fd = new FormData();
+      fd.append('kind', kind);
+      fd.append('file', blob, name);
+      setBusy(t('photo.uploading'));
+      return api('POST', 'brand', fd, true).then(function (j) {
+        setBusy(null);
+        if (!j.url) { alertBox(t(j.error || 'photo.upload_failed')); return null; }
+        return j.url;
+      }).catch(function () { setBusy(null); alertBox(t('photo.upload_failed')); return null; });
+    }
+    if (kind === 'logo') {
+      if (file.size > 2 * 1024 * 1024) { alertBox(t('brand.too_big')); return Promise.resolve(null); }
+      return send(file, file.name);
+    }
+    var square = kind === 'favicon';
+    return cropLocal(file, square ? 1 : 1200 / 630, square ? 512 : 1200, square ? 512 : 630, square ? 512 : 0,
+      square ? t('brand.favicon') : t('brand.og')).then(function (blob) {
+      return blob ? send(blob, square ? 'icon.png' : 'og.jpg') : null;
+    });
+  }
+
+  // Кадр для картинки с компьютера: рамка нужной формы, результат — готовый файл нужного размера.
+  function cropLocal(file, ratio, outW, outH, minSide, title) {
+    return new Promise(function (resolve) {
+      var url = URL.createObjectURL(file);
+      var probe = new Image();
+      probe.onerror = function () { URL.revokeObjectURL(url); alertBox(t('photo.bad_type')); resolve(null); };
+      probe.onload = function () {
+        if (minSide && Math.min(probe.naturalWidth, probe.naturalHeight) < minSide) {
+          URL.revokeObjectURL(url); alertBox(t('brand.icon_small')); resolve(null); return;
+        }
+        var img = h('img', { alt: '', src: url });
+        var cropper = null;
+        var box = h('div', { class: 'ed ed--small', role: 'dialog', 'aria-modal': 'true', 'aria-label': title }, [
+          h('div', { class: 'ed__h' }, [h('h3', { text: title }), h('span', { class: 'ed__frame', text: outW + ' × ' + outH })]),
+          h('div', { class: 'ed__b' }, [h('div', { class: 'ed__stage' }, [img])]),
+          h('div', { class: 'ed__f' }, [
+            h('button', { type: 'button', class: 'btn btn--ghost', text: t('btn.cancel'), onclick: function () { close(null); } }),
+            h('button', { type: 'button', class: 'btn btn--action', text: t('btn.apply'), onclick: function () {
+              var c = cropper.getCroppedCanvas({ width: outW, height: outH, imageSmoothingQuality: 'high', fillColor: ratio === 1 ? 'transparent' : '#fff' });
+              c.toBlob(function (b) { close(b); }, ratio === 1 ? 'image/png' : 'image/jpeg', 0.9);
+            } })
+          ])
+        ]);
+        var ov = h('div', { class: 'mo' }, [box]);
+        function onKey(e) { if (e.key === 'Escape') close(null); }
+        function close(v) { document.removeEventListener('keydown', onKey); if (cropper) cropper.destroy(); ov.remove(); URL.revokeObjectURL(url); resolve(v); }
+        document.body.appendChild(ov);
+        document.addEventListener('keydown', onKey);
+        img.addEventListener('load', function () {
+          cropper = new Cropper(img, { aspectRatio: ratio, viewMode: 1, dragMode: 'move', autoCropArea: 1, background: false, zoomOnWheel: true });
+        });
+      };
+      probe.src = url;
+    });
+  }
+
+  function brandBox(kind, label, hint, imgClass) {
+    var s = S.site.settings;
+    var cur = s[kind];
+    var input = h('input', { type: 'file', accept: kind === 'logo' ? '.png,.svg,.jpg,.jpeg,.webp,image/png,image/svg+xml,image/jpeg,image/webp' : 'image/png,image/jpeg,image/webp', hidden: true });
+    input.addEventListener('change', function () {
+      var file = input.files[0];
+      input.value = '';
+      if (!file) return;
+      brandUpload(kind, file).then(function (u) {
+        if (!u) return;
+        s[kind] = Object.assign({}, s[kind] || (kind === 'logo' ? { with_title: true } : {}), { url: u });
+        changed(); renderForm();
+      });
+    });
+    var view = cur && cur.url ? h('img', { class: 'brand__img ' + imgClass, alt: '', src: cur.url }) : h('span', { class: 'brand__none ' + imgClass, text: t('photo.none') });
+    return h('div', { class: 'fld brand' }, [
+      h('span', { class: 'fld__l', text: label }),
+      h('div', { class: 'brand__row' }, [view, h('div', { class: 'ph__acts' }, [
+        h('button', { type: 'button', class: 'btn btn--ghost btn--small', text: cur ? t('photo.replace') : t('photo.upload'), onclick: function () { input.click(); } }),
+        cur ? h('button', { type: 'button', class: 'linkbtn linkbtn--danger', text: t('photo.remove'), onclick: function () { s[kind] = null; changed(); renderForm(); } }) : null,
+        input
+      ])]),
+      h('small', { class: 'hint', text: hint })
+    ]);
+  }
+
+  function formDesign(root) {
+    var s = S.site.settings;
+    formHead(root, t('set.design'), t('tree.settings'));
+    var f = h('div', { class: 'fbody' });
+    f.appendChild(brandBox('logo', t('brand.logo'), t('hint.logo'), 'brand__img--logo'));
+    if (s.logo) f.appendChild(toggle(t('brand.with_title'), s.logo.with_title !== false, function (v) { s.logo.with_title = v; changed(); }));
+    f.appendChild(brandBox('favicon', t('brand.favicon'), s.favicon ? t('hint.favicon') : t('hint.favicon_none'), 'brand__img--icon'));
+    f.appendChild(brandBox('og_image', t('brand.og'), t('hint.og'), 'brand__img--og'));
+    root.appendChild(f);
+  }
+
+  /* ---------------------------------------------------------------- Почта (раздел 10.10) */
+
+  function formMail(root) {
+    var P = S.priv;
+    formHead(root, t('set.mail'), t('tree.settings'));
+    var f = h('div', { class: 'fbody' });
+    f.appendChild(privField('mail_from', t('field.mail_from'), { type: 'email', placeholder: P.mail_from_default, hint: t('hint.mail_from', { def: P.mail_from_default }) }));
+    var det = h('details', { class: 'more' }, [h('summary', { text: t('mail.own_box') })]);
+    if (P.smtp_host || privErr('smtp_host') || privErr('smtp_port')) det.open = true;
+    det.appendChild(h('p', { class: 'hint', text: t('hint.smtp') }));
+    det.appendChild(privField('smtp_host', t('field.smtp_host'), { placeholder: 'smtp.yandex.ru' }));
+    det.appendChild(h('div', { class: 'two' }, [
+      privField('smtp_port', t('field.smtp_port'), { inputmode: 'numeric', placeholder: P.smtp_secure === 'ssl' ? '465' : '587' }),
+      seg(t('field.smtp_secure'), [['ssl', 'SSL'], ['tls', 'STARTTLS']], P.smtp_secure, function (v) { P.smtp_secure = v; changed(); renderForm(); })
+    ]));
+    det.appendChild(privField('smtp_user', t('field.smtp_user'), { ac: 'off' }));
+    var pass = h('input', { type: 'password', autocomplete: 'new-password', placeholder: P.smtp_pass_set ? '••••••••' : '', 'data-field': 'smtp_pass' });
+    if (P.smtp_pass) pass.value = P.smtp_pass;
+    pass.addEventListener('input', function () { P.smtp_pass = pass.value; changed(); });
+    det.appendChild(field(t('field.smtp_pass'), pass, P.smtp_pass_set ? t('hint.smtp_pass_set') : null));
+    f.appendChild(det);
+
+    f.appendChild(section(t('mail.test')));
+    var email = BOOT.admin.email;
+    var out = h('p', { class: 'hint', text: P.mail_test_ok ? t('mail.test_ok_at', { at: P.mail_test_ok }) : '' });
+    f.appendChild(h('button', { type: 'button', class: 'btn btn--ghost', disabled: !email, text: t('mail.test_btn'), onclick: function (e) {
+      var btn = e.currentTarget;
+      btn.disabled = true;
+      out.className = 'hint';
+      out.textContent = t('mail.sending');
+      api('POST', 'mail_test', P).then(function (j) {
+        btn.disabled = false;
+        if (j.ok) {
+          out.className = 'hint hint--ok';
+          out.textContent = t('mail.sent', { to: j.to }) + (j.saved ? '' : ' ' + t('mail.sent_unsaved'));
+          if (j.saved) { P.mail_test_ok = 'now'; renderTree(); }
+        } else {
+          out.className = 'hint hint--err';
+          out.textContent = t('mail.failed') + ' ' + (j.error || '');
+        }
+      }).catch(function () { btn.disabled = false; out.className = 'hint hint--err'; out.textContent = t('mail.failed'); });
+    } }));
+    f.appendChild(h('small', { class: 'hint', text: email ? t('hint.mail_test', { to: email }) : t('hint.mail_no_admin') }));
+    f.appendChild(out);
+    root.appendChild(f);
+  }
+
+  /* ---------------------------------------------------------------- Резервные копии (раздел 10.11) */
+
+  function backupDate(b) {
+    var d = new Date(b.date + 'T12:00:00');
+    var today = new Date(); today.setHours(12, 0, 0, 0);
+    var days = Math.round((today - d) / 86400000);
+    var txt = new Intl.DateTimeFormat(BOOT.ui, { day: 'numeric', month: 'long' }).format(d);
+    if (days === 0) txt = t('backup.today') + ', ' + txt;
+    else if (days === 1) txt = t('backup.yesterday') + ', ' + txt;
+    return txt + (b.time ? ', ' + b.time : '');
+  }
+
+  function formBackups(root) {
+    formHead(root, t('set.backups'), t('tree.settings'));
+    var f = h('div', { class: 'fbody' });
+    f.appendChild(h('p', { class: 'hint', text: t('hint.backups') }));
+    var list = h('div', { class: 'bk' }, [h('p', { class: 'hint', text: t('app.loading') })]);
+    function draw(items) {
+      list.innerHTML = '';
+      if (!items.length) list.appendChild(h('p', { class: 'hint', text: t('backup.none') }));
+      items.forEach(function (b) {
+        list.appendChild(h('div', { class: 'bk__row' }, [
+          h('span', { class: 'bk__d', text: backupDate(b) }),
+          b.kind !== 'daily' ? h('span', { class: 'bk__tag', text: t('backup.kind_' + b.kind) }) : null,
+          h('button', { type: 'button', class: 'btn btn--ghost btn--small', text: t('backup.restore'), onclick: function () { restore(b); } })
+        ]));
+      });
+    }
+    function restore(b) {
+      var when = backupDate(b);
+      confirmBox(t('backup.restore_q', { date: when }), t('backup.restore_hint', { date: when }) + (S.dirty ? ' ' + t('backup.restore_unsaved') : ''), t('backup.restore'), true).then(function (ok) {
+        if (!ok) return;
+        setBusy(t('backup.restoring'));
+        api('POST', 'backup_restore', { name: b.name }).then(function (j) {
+          setBusy(null);
+          if (!j.ok) { alertBox(t(j.error || 'backup.failed')); return; }
+          S.dirty = false;
+          api('GET', 'site').then(function (r) {
+            S.site = r.site; S.priv = r.private; S.errors = []; S.warnings = []; S.idmap = {};
+            reindex(); renderAll(); schedulePreview(0);
+            flash(t('backup.restored'), 'ok');
+          });
+        }).catch(function () { setBusy(null); alertBox(t('backup.failed')); });
+      });
+    }
+    f.appendChild(h('button', { type: 'button', class: 'btn btn--ghost', text: t('backup.now'), onclick: function (e) {
+      e.currentTarget.disabled = true;
+      api('POST', 'backup_now').then(function (j) { draw(j.list || []); flash(t('backup.made'), 'ok'); renderForm(); });
+    } }));
+    f.appendChild(list);
+    f.appendChild(h('p', { class: 'hint', text: t('hint.backups_download') }));
+    root.appendChild(f);
+    api('GET', 'backups').then(function (j) { draw(j.list || []); });
+  }
+
+  /* ---------------------------------------------------------------- Дополнительно */
+
+  function formAdvanced(root) {
+    var P = S.priv;
+    formHead(root, t('set.advanced'), t('tree.settings'));
+    var f = h('div', { class: 'fbody' });
+    var area = h('textarea', { rows: 10, class: 'mono', spellcheck: 'false', 'data-field': 'counter_code', placeholder: '<script>…</script>' });
+    area.value = P.counter_code || '';
+    var cnt = h('span', { class: 'cnt' });
+    function upd() { cnt.textContent = area.value.length + ' / 5000'; cnt.classList.toggle('is-over', area.value.length > 5000); }
+    area.addEventListener('input', function () { P.counter_code = area.value; upd(); changed(); });
+    upd();
+    f.appendChild(field(t('field.counter_code'), area, t('hint.counter'), cnt, privErr('counter_code')));
+    f.appendChild(h('p', { class: 'hint hint--warn', text: t('hint.counter_law') }));
+
+    // Фотосервис (раздел 10.6.1): ключ хранится только в этой установке, показывается замаскированным.
+    f.appendChild(section(t('sec.photo_service')));
+    f.appendChild(seg(t('field.photo_service'), [['claid', 'Claid.ai'], ['photoroom', 'Photoroom']], P.photo_service, function (v) { P.photo_service = v; changed(); formAdvancedRedraw(); }));
+    var key = h('input', { type: 'password', autocomplete: 'off', spellcheck: 'false', placeholder: P.photo_key_masked || '', 'data-field': 'photo_api_key' });
+    if (P.photo_api_key) key.value = P.photo_api_key;
+    key.addEventListener('input', function () { P.photo_api_key = key.value; changed(); });
+    var clear = P.photo_key_masked ? h('button', { type: 'button', class: 'linkbtn linkbtn--danger', text: t('photo.key_clear'), onclick: function () { P.photo_api_key = ''; P.photo_key_masked = ''; changed(); formAdvancedRedraw(); } }) : null;
+    f.appendChild(field(t('field.photo_api_key'), key, P.photo_key_masked ? t('hint.photo_key_set') : t('hint.photo_key'), clear, privErr('photo_api_key')));
+    f.appendChild(h('p', { class: 'hint' }, [t('hint.photo_service') + ' ', h('a', { href: P.photo_service === 'photoroom' ? 'https://app.photoroom.com/api-dashboard' : 'https://claid.ai/', target: '_blank', rel: 'noopener', text: P.photo_service === 'photoroom' ? 'photoroom.com' : 'claid.ai' })]));
+    root.appendChild(f);
+    function formAdvancedRedraw() { root.innerHTML = ''; formAdvanced(root); }
+  }
+
+  /* ---------------------------------------------------------------- Обновление (раздел 10.12) */
+
+  function notesOf(u) {
+    var n = u && u.notes ? (u.notes[BOOT.ui] && u.notes[BOOT.ui].length ? u.notes[BOOT.ui] : u.notes.ru || []) : [];
+    return Array.isArray(n) ? n : [];
+  }
+
+  // Полоса под верхней панелью: «Доступна версия X · Что нового · Обновить».
+  function renderUpbar() {
+    var bar = $('[data-upbar]');
+    bar.innerHTML = '';
+    var u = S.upd;
+    if (!u || !u.newer) return;
+    bar.appendChild(h('span', { text: t('update.available', { v: u.latest }) }));
+    bar.appendChild(h('button', { type: 'button', class: 'linkbtn', text: t('update.whats_new'), onclick: function () { select('set:update'); } }));
+    bar.appendChild(h('button', { type: 'button', class: 'btn btn--action btn--small', text: t('update.run'), onclick: function () { select('set:update'); runUpdate(); } }));
+  }
+
+  function formUpdate(root) {
+    formHead(root, t('set.update'), t('tree.settings'));
+    var f = h('div', { class: 'fbody' });
+    var u = S.upd || {};
+    f.appendChild(h('div', { class: 'upd__ver' }, [
+      h('span', { class: 'muted', text: t('update.current') }), h('b', { text: u.current || BOOT.engine || '—' }),
+      h('span', { class: 'muted', text: t('update.latest') }), h('b', { text: u.latest || t('update.unknown') })
+    ]));
+    var notes = notesOf(u);
+    if (u.newer && notes.length) {
+      f.appendChild(h('b', { text: t('update.whats_new') }));
+      f.appendChild(h('ul', { class: 'upd__notes' }, notes.map(function (n) { return h('li', { text: n }); })));
+    }
+    if (!u.newer && u.latest) f.appendChild(h('p', { class: 'hint', text: t('update.uptodate') }));
+    var acts = h('div', { class: 'upd__acts' }, [
+      h('button', { type: 'button', class: 'btn btn--ghost', text: t('update.check'), onclick: function (e) {
+        e.currentTarget.disabled = true;
+        api('POST', 'update_check').then(function (j) { S.upd = j; renderUpbar(); renderForm(); }).catch(function () { renderForm(); });
+      } }),
+      u.newer && u.writable ? h('button', { type: 'button', class: 'btn btn--action', text: t('update.run'), onclick: runUpdate }) : null
+    ]);
+    f.appendChild(acts);
+    if (u.newer && !u.writable) {
+      f.appendChild(h('p', { class: 'hint hint--warn' }, [t('update.manual') + ' ', u.zip ? h('a', { href: u.zip, text: t('update.download_zip') }) : null]));
+    }
+    f.appendChild(h('div', { 'data-upd-steps': '' }));
+    if (u.rollback) {
+      f.appendChild(section(t('update.rollback_title')));
+      f.appendChild(h('button', { type: 'button', class: 'btn btn--ghost', text: t('update.rollback', { v: u.rollback }), onclick: function () {
+        confirmBox(t('update.rollback', { v: u.rollback }), t('update.rollback_hint'), t('update.rollback_ok'), true).then(function (ok) {
+          if (!ok) return;
+          setBusy(t('update.rolling_back'));
+          api('POST', 'update_rollback').then(function (j) {
+            setBusy(null);
+            if (!j.ok) { alertBox(t(j.error || 'update.failed')); return; }
+            location.reload();
+          }).catch(function () { setBusy(null); location.reload(); });
+        });
+      } }));
+    }
+    root.appendChild(f);
+  }
+
+  var UPD_STEPS = ['prepare', 'download', 'replace', 'finish'];
+
+  // «Обновить»: шаги отдельными запросами, прогресс — списком; ошибка — сервер уже откатил.
+  function runUpdate() {
+    if (S.dirty) { alertBox(t('update.save_first')); return; }
+    confirmBox(t('update.confirm_title', { v: S.upd.latest }), t('update.confirm'), t('update.run'), false).then(function (ok) {
+      if (!ok) return;
+      var box = $('[data-upd-steps]');
+      var list = h('ol', { class: 'upd__steps' }, UPD_STEPS.map(function (s) { return h('li', { 'data-s': s, text: t('update.step.' + s) }); }));
+      if (box) { box.innerHTML = ''; box.appendChild(list); }
+      setBusy(t('update.running'));
+      function mark(i) {
+        Array.prototype.forEach.call(list.children, function (li, k) { li.className = k < i ? 'is-done' : (k === i ? 'is-now' : ''); });
+      }
+      function step(i) {
+        mark(i);
+        api('POST', 'update_step', { step: UPD_STEPS[i] }).then(function (j) {
+          if (!j.ok) {
+            setBusy(null);
+            alertBox(t(j.error || 'update.failed') + (j.rolled_back ? ' ' + t('update.rolled_back') : ''));
+            api('GET', 'update').then(function (u) { S.upd = u; renderUpbar(); renderForm(); });
+            return;
+          }
+          if (j.next) { step(UPD_STEPS.indexOf(j.next)); return; }
+          mark(UPD_STEPS.length);
+          setBusy(null);
+          flash(t('update.done', { v: j.version }), 'ok');
+          setTimeout(function () { location.reload(); }, 1200);
+        }).catch(function () {
+          setBusy(null);
+          alertBox(t('update.failed') + ' ' + t('update.rolled_back'));
+          setTimeout(function () { location.reload(); }, 1500);
+        });
+      }
+      step(0);
+    });
+  }
+
+  /* ---------------------------------------------------------------- Перед запуском (раздел 10.13) */
+
+  function allNodes() { return Object.keys(IDX).map(function (k) { return IDX[k]; }); }
+  function shownNode(i) {
+    for (var n = i; n; n = n.tile ? info(n.tile) : null) {
+      if (n.node.hidden) return false;
+      if (n.kind === 'tile' && n.block && n.block.hidden) return false;
+      if (n.tab && n.tab.hidden) return false;
+    }
+    return true;
+  }
+  function filledAll(obj) { return langs().every(function (l) { return tx(obj, l).trim() !== ''; }); }
+
+  function launchItems() {
+    if (!S.site || !S.priv) return [];
+    var s = S.site.settings, items = [];
+    var blocks = allNodes().filter(function (i) { return i.kind === 'block' && shownNode(i); });
+    var pays = blocks.filter(function (i) { return i.node.type === 'pay'; });
+    var services = blocks.filter(function (i) { return i.node.type === 'service'; });
+    items.push({ key: 'name', ok: filledAll(s.site_title), go: 'set:main' });
+    items.push({ key: 'brand', ok: !!(s.logo && s.favicon), go: 'set:design' });
+    items.push({ key: 'og', ok: !!s.og_image, go: 'set:design' });
+    items.push({ key: 'seo', ok: filledAll(s.seo_title) && filledAll(s.seo_description), go: 'set:main' });
+    if (pays.length || services.length) {
+      var feeds = [];
+      pays.concat(services).forEach(function (i) { var fd = feedOf(i.node); if (feeds.indexOf(fd) < 0) feeds.push(fd); });
+      var okOwner = feeds.every(function (fd) {
+        var op = S.site.operators.filter(function (o) { return String(o.id) === String(fd.operator); })[0];
+        return op && String(op.name || '').trim() && String(op.tax_id || '').trim() && String(op.address || '').trim();
+      });
+      items.push({ key: 'owner', ok: okOwner, go: 'set:operators' });
+    }
+    if (pays.length || services.length || (S.priv.counter_code || '').trim()) {
+      var d = S.site.docs || {};
+      items.push({ key: 'docs', ok: !!(d.offer && d.offer.show && d.privacy && d.privacy.show), go: 'set:docs' });
+    }
+    if (pays.length) {
+      var bad = pays.filter(function (i) { return !(i.node.methods || []).some(function (m) { return m.on; }); })[0];
+      items.push({ key: 'pay', ok: !bad && !!S.priv.payment_checked, go: bad ? keyOf(bad.node) : 'launch', manual: true });
+    }
+    items.push({ key: 'mail', ok: !!(BOOT.admin.email && S.priv.mail_test_ok), go: 'set:mail' });
+    if (multi()) {
+      var miss = allNodes().filter(function (i) { return shownNode(i) && missingLangs(i.node).length; })[0];
+      items.push({ key: 'langs', ok: !miss, go: miss ? miss.key : 'launch' });
+    }
+    return items;
+  }
+
+  function formLaunch(root) {
+    var L = launchItems(), done = L.filter(function (x) { return x.ok; }).length;
+    formHead(root, t('launch.title'), t('launch.count', { n: done, m: L.length }));
+    var f = h('div', { class: 'fbody' });
+    f.appendChild(h('p', { class: 'hint', text: done === L.length ? t('launch.all_done') : t('hint.launch') }));
+    L.forEach(function (it) {
+      f.appendChild(h('button', { type: 'button', class: 'chk' + (it.ok ? ' is-ok' : ''), onclick: function () { if (it.go !== 'launch') select(it.go); } }, [
+        h('span', { class: 'chk__m', 'aria-hidden': 'true', text: it.ok ? '✓' : '○' }),
+        h('span', { class: 'chk__t' }, [h('b', { text: t('launch.' + it.key) }), h('small', { text: t('launch.' + it.key + '_hint') })])
+      ]));
+      if (it.manual) {
+        f.appendChild(toggle(t('launch.pay_checked'), S.priv.payment_checked, function (v) { S.priv.payment_checked = v; changed(); renderForm(); }));
+      }
+    });
+    root.appendChild(f);
+  }
+
 
   /* ---------------------------------------------------------------- способы оплаты (раздел 10.7) */
 
@@ -1207,13 +1627,41 @@
 
   /* ---------------------------------------------------------------- фото (раздел 10.6) */
 
-  function photoField(node, key, aspect) {
+  // Фотосервис (раздел 10.6.1): режим по месту фото — вина «Студийное фото», остальное «Улучшить».
+  // Выбор «обработанное или оригинал» хранится у фото и уходит на сервер с сохранением.
+  function svcOn() { return !!(S.priv && S.priv.photo_ready); }
+
+  function photoField(node, key, aspect, wine) {
     var p = node[key];
+    var mode = svcOn() ? (node._svc || (wine ? 'studio' : 'enhance')) : 'none';
     var thumb;
     if (p) {
-      thumb = h('img', { class: 'ph__img ph__img--' + aspect.replace(':', 'x'), alt: '', src: p._thumb || (p.crop || p.aspect === aspect ? p.thumb : '/admin/api/original?id=' + p.id) });
+      thumb = h('img', { class: 'ph__img ph__img--' + aspect.replace(':', 'x'), alt: '', src: p._thumb || (p.crop || p.aspect === aspect ? p.thumb : srcOf(p)) });
     } else {
       thumb = h('span', { class: 'ph__none ph__img--' + aspect.replace(':', 'x'), text: t('photo.none') });
+    }
+    function edit(ph, hint) {
+      openEditor(ph, aspect, false, function (res) { node[key] = Object.assign(ph, res); changed(); renderForm(); }, hint);
+    }
+    // Переключить источник: кадр и верх страницы считаются заново (у файлов разные размеры).
+    function useSource(ph, processed, crop) {
+      ph.use_processed = processed; ph.crop = crop || null; ph.head_crop = null; ph.rotate = 0;
+      ph._thumb = null; ph._head_thumb = null;
+      if (ph === node[key]) { changed(); renderForm(); }
+    }
+    function process(ph, again) {
+      var cancelled = false;
+      busyBox(t('photo.processing'), function () { cancelled = true; edit(ph); });
+      api('POST', 'photo_process', { id: ph.id, mode: mode, aspect: aspect, again: again }).then(function (j) {
+        if (cancelled) return;
+        busyBox(null);
+        if (!j.ok) { alertBox(t(j.error || 'photo.svc_failed')); edit(ph); return; }
+        ph.mode = j.mode; ph.pv = j.processed;
+        compareBox(ph).then(function (useIt) {
+          if (useIt) { useSource(ph, true, j.crop); edit(ph, j.fits ? null : t('photo.not_fit')); }
+          else { if (ph.use_processed) useSource(ph, false); edit(ph); }
+        });
+      }).catch(function () { if (cancelled) return; busyBox(null); alertBox(t('photo.svc_failed')); edit(ph); });
     }
     var input = h('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp', hidden: true });
     input.addEventListener('change', function () {
@@ -1227,21 +1675,61 @@
       api('POST', 'photo', fd, true).then(function (j) {
         setBusy(null);
         if (!j.photo) { alertBox(t(j.error || 'photo.upload_failed')); return; }
-        openEditor(j.photo, aspect, false, function (res) {
-          node[key] = Object.assign(j.photo, res);
-          changed(); renderForm();
-        });
+        if (mode === 'none') edit(j.photo); else process(j.photo, false);
       }).catch(function () { setBusy(null); alertBox(t('photo.upload_failed')); });
     });
     var acts = h('div', { class: 'ph__acts' }, [
       h('button', { type: 'button', class: 'btn btn--ghost btn--small', text: p ? t('photo.replace') : t('photo.upload'), onclick: function () { input.click(); } }),
-      p ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', text: t('photo.crop'), onclick: function () {
-        openEditor(p, aspect, false, function (res) { Object.assign(p, res); changed(); renderForm(); });
-      } }) : null,
+      p ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', text: t('photo.crop'), onclick: function () { edit(p); } }) : null,
+      p && mode !== 'none' ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', text: t(p.mode === mode ? 'photo.process_again' : 'photo.process'), onclick: function () { process(p, p.mode === mode); } }) : null,
       p ? h('button', { type: 'button', class: 'linkbtn linkbtn--danger', text: t('photo.remove'), onclick: function () { node[key] = null; changed(); renderForm(); } }) : null,
       input
     ]);
-    return h('div', { class: 'fld ph' }, [h('span', { class: 'fld__l', text: t('field.photo') + ' · ' + t('frame.' + aspect) }), h('div', { class: 'ph__row' }, [thumb, acts])]);
+    var status = null;
+    if (p && p.mode) {
+      status = h('p', { class: 'ph__svc' }, p.use_processed
+        ? [t('photo.processed') + ': ' + t('photo.mode.' + p.mode) + ' · ', h('button', { type: 'button', class: 'linkbtn', text: t('photo.back_original'), onclick: function () { useSource(p, false); edit(p); } })]
+        : [h('button', { type: 'button', class: 'linkbtn', text: t('photo.back_processed') + ' (' + t('photo.mode.' + p.mode) + ')', onclick: function () { useSource(p, true); edit(p); } })]);
+    }
+    var modes = svcOn() ? seg(t('photo.processing_mode'), [['studio', t('photo.mode.studio')], ['enhance', t('photo.mode.enhance')], ['none', t('photo.mode.none')]], mode,
+      function (v) { node._svc = v; renderForm(); }) : null;
+    if (modes) modes.classList.add('ph__modes');
+    return h('div', { class: 'fld ph' }, [h('span', { class: 'fld__l', text: t('field.photo') + ' · ' + t('frame.' + aspect) }), modes, h('div', { class: 'ph__row' }, [thumb, acts]), status]);
+  }
+
+  // Файл фото для редактора: обработанный или оригинал — по несохранённому выбору.
+  function srcOf(p) {
+    return '/admin/api/original?id=' + p.id + '&src=' + (p.use_processed ? 'proc&v=' + encodeURIComponent(p.pv || '') : 'orig');
+  }
+
+  // «Было / Стало» (раздел 10.6.1). true — «Применить», false — «Оставить как было».
+  function compareBox(p) {
+    return new Promise(function (resolve) {
+      var ov;
+      function done(v) { ov.remove(); resolve(v); }
+      ov = h('div', { class: 'mo' }, [h('div', { class: 'mbox cmp', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('photo.compare') }, [
+        h('h3', { text: t('photo.compare') + ' · ' + t('photo.mode.' + p.mode) }),
+        h('div', { class: 'cmp__row' }, [
+          h('figure', {}, [h('img', { alt: '', src: '/admin/api/original?id=' + p.id + '&src=orig' }), h('figcaption', { text: t('photo.before') })]),
+          h('figure', {}, [h('img', { alt: '', src: '/admin/api/original?id=' + p.id + '&src=proc&v=' + encodeURIComponent(p.pv || '') }), h('figcaption', { text: t('photo.after') })])
+        ]),
+        h('div', { class: 'mbox__acts' }, [
+          h('button', { type: 'button', class: 'btn btn--ghost', text: t('photo.keep'), onclick: function () { done(false); } }),
+          h('button', { type: 'button', class: 'btn btn--action', text: t('btn.apply'), onclick: function () { done(true); } })
+        ])
+      ])]);
+      document.body.appendChild(ov);
+    });
+  }
+
+  // Окно ожидания с «Отменить»; busyBox(null) закрывает.
+  function busyBox(text, onCancel) {
+    var old = $('.busy--svc');
+    if (old) old.remove();
+    if (!text) return;
+    var b = h('div', { class: 'busy busy--svc', role: 'status' }, [text + ' ',
+      h('button', { type: 'button', class: 'linkbtn', text: t('btn.cancel'), onclick: function () { b.remove(); onCancel(); } })]);
+    document.body.appendChild(b);
   }
 
   function headPhotoField(tl) {
@@ -1258,9 +1746,9 @@
   var SIZES = { '3:2': [1600, 1067], '4:5': [1200, 1500] };
 
   // Редактор кадра на Cropper.js: рамка неподвижна, двигается и масштабируется фото.
-  function openEditor(photo, aspect, head, onApply) {
+  function openEditor(photo, aspect, head, onApply, hint) {
     var ratio = aspect === '3:2' ? 3 / 2 : 4 / 5;
-    var img = h('img', { alt: '', src: '/admin/api/original?id=' + photo.id });
+    var img = h('img', { alt: '', src: srcOf(photo) });
     var zoom = h('input', { type: 'range', min: '1', max: '4', step: '0.01', value: '1' });
     var straight = h('input', { type: 'range', min: '-10', max: '10', step: '0.1', value: '0', disabled: head });
     var warn = h('p', { class: 'hint hint--warn', hidden: true, text: t('photo.small') });
@@ -1270,7 +1758,7 @@
     var base90 = 0, baseRatio = 1, cropper = null;
     var box = h('div', { class: 'ed', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('photo.editor') }, [
       h('div', { class: 'ed__h' }, [h('h3', { text: head ? t('photo.head') : t('photo.editor') }), h('span', { class: 'ed__frame', text: t('frame.' + aspect) })]),
-      h('div', { class: 'ed__b' }, [h('div', { class: 'ed__stage' }, [img]), h('div', { class: 'ed__side' }, [h('b', { text: t('photo.how') }), previews, warn])]),
+      h('div', { class: 'ed__b' }, [h('div', { class: 'ed__stage' }, [img]), h('div', { class: 'ed__side' }, [h('b', { text: t('photo.how') }), previews, warn, hint ? h('p', { class: 'hint hint--warn', text: hint }) : null])]),
       h('div', { class: 'ed__tools' }, [
         h('label', {}, [t('photo.zoom') + ' ', zoom]),
         head ? null : h('button', { type: 'button', class: 'btn btn--ghost btn--small', text: '↻ ' + t('photo.rotate'), onclick: function () {
@@ -1432,7 +1920,7 @@
 
   function previewPathFor(key) {
     var i = IDX[key] || IDX[+key];
-    if (!i) return key === 'footer' || key === 'header' || key.indexOf('set:') === 0 ? S.pvPath : '/';
+    if (!i) return key === 'footer' || key === 'header' || key === 'launch' || key.indexOf('set:') === 0 ? S.pvPath : '/';
     if (i.kind === 'tile') {
       var o = opens(i.node);
       if (o === 'page' || o === 'static') return tabPrefix(i.tab) + '/' + slugOf(i.node);
@@ -1490,7 +1978,7 @@
     if (!S.dirty || S.saving) return;
     S.saving = true;
     renderStatus();
-    api('POST', 'save', { site: S.site }).then(function (j) {
+    api('POST', 'save', { site: S.site, private: S.priv }).then(function (j) {
       S.saving = false;
       if (!j.ok) {
         S.errors = j.errors || [];
@@ -1508,6 +1996,7 @@
       var sel = real(S.sel);
       Object.keys(S.open).forEach(function (k) { if (real(k) !== k) S.open[real(k)] = S.open[k]; });
       S.site = j.site;
+      S.priv = j.private || S.priv;
       S.idmap = {};
       S.errors = [];
       S.warnings = j.warnings || [];

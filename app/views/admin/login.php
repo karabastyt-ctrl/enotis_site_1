@@ -17,7 +17,7 @@
       <input name="password" type="password" autocomplete="current-password" required></label>
     <button class="btn btn--action btn--wide"><?= e(ta('login.submit', $ui)) ?></button>
   </form>
-  <p class="auth__hint"><?= e(ta('login.forgot_hint', $ui)) ?></p>
+  <p class="auth__hint"><a href="/admin/forgot"><?= e(ta('login.forgot', $ui)) ?></a></p>
 </main>
 </body>
 </html>

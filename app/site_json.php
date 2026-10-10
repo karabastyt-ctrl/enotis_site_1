@@ -149,6 +149,10 @@ function site_export(): array
             'maps'            => $set['maps'] ?? 'google',
             'show_prices'     => ($set['show_prices'] ?? '1') === '1',
             'cookie_notice'   => ($set['cookie_notice'] ?? '1') === '1',
+            'logo'            => !empty($set['logo_path'])
+                ? ['url' => '/uploads/' . $set['logo_path'], 'with_title' => ($set['logo_with_title'] ?? '1') === '1'] : null,
+            'favicon'         => !empty($set['favicon_path']) ? ['url' => '/uploads/' . $set['favicon_path']] : null,
+            'og_image'        => !empty($set['og_image_path']) ? ['url' => '/uploads/' . $set['og_image_path']] : null,
         ],
         'header'    => ['show' => ($set['header_show'] ?? '1') === '1', 'burger' => $set['header_burger'] ?? 'auto'],
         'footer'    => ['show' => ($set['footer_show'] ?? '1') === '1', 'email' => (string) ($set['footer_email'] ?? ''),
@@ -251,7 +255,9 @@ function export_photo($photoId, array $ctx): ?array
     $head = $p['head_crop_w'] !== null ? ['x' => (float) $p['head_crop_x'], 'y' => (float) $p['head_crop_y'], 'w' => (float) $p['head_crop_w'], 'h' => (float) $p['head_crop_h']] : null;
     $paths = photo_paths($p);
     return ['id' => (int) $p['id'], 'aspect' => $p['aspect'], 'rotate' => (float) $p['rotate'],
-            'crop' => $crop, 'head_crop' => $head, 'thumb' => '/uploads/' . $paths['s'], 'head_thumb' => '/uploads/' . $paths['hs']];
+            'crop' => $crop, 'head_crop' => $head, 'thumb' => '/uploads/' . $paths['s'], 'head_thumb' => '/uploads/' . $paths['hs'],
+            'mode' => $p['processed_path'] ? $p['process_mode'] : null, 'use_processed' => $p['processed_path'] && (int) $p['use_processed'] === 1,
+            'pv' => $p['processed_path'] ?: null];
 }
 
 /* ---------------------------------------------------------------- проверки */
@@ -578,7 +584,15 @@ function site_write(array $site, array $opts = []): array
         'footer_show'   => ($site['footer']['show'] ?? true) ? '1' : '0',
         'footer_email'  => nn($site['footer']['email'] ?? null),
         'footer_phone'  => nn($site['footer']['phone'] ?? null),
+        // Оформление (раздел 10.5): только свои файлы из public/uploads/brand.
+        'logo_path'       => brand_path($s['logo']['url'] ?? null),
+        'logo_with_title' => ($s['logo']['with_title'] ?? true) ? '1' : '0',
+        'favicon_path'    => brand_path($s['favicon']['url'] ?? null),
+        'og_image_path'   => brand_path($s['og_image']['url'] ?? null),
     ];
+    if ($plain['favicon_path']) {
+        favicon_ensure($plain['favicon_path']);
+    }
     $st = $pdo->prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');
     foreach ($plain as $k => $v) {
         $st->execute([$k, $v]);
@@ -888,7 +902,7 @@ function write_photo(?array $photo, string $aspect, array $ctx): ?int
         $id = (int) db()->lastInsertId();
     } elseif (is_int($photo['id'] ?? null)) {
         $id = $photo['id'];
-        $st = db()->prepare('SELECT aspect, crop_w FROM photos WHERE id = ?');
+        $st = db()->prepare('SELECT aspect, crop_w, processed_path, use_processed FROM photos WHERE id = ?');
         $st->execute([$id]);
         $old = $st->fetch();
         if (!$old) {
@@ -898,9 +912,11 @@ function write_photo(?array $photo, string $aspect, array $ctx): ?int
         if ($old['aspect'] !== $aspect && ($photo['aspect'] ?? $old['aspect']) !== $aspect) {
             $crop = [null, null, null, null];
         }
+        // Обработанный или оригинал (раздел 10.6.1): выбор едет с сохранением, как кадр.
+        $use = array_key_exists('use_processed', $photo) ? (int) ($photo['use_processed'] && $old['processed_path']) : (int) $old['use_processed'];
         db()->prepare('UPDATE photos SET aspect = ?, crop_x = ?, crop_y = ?, crop_w = ?, crop_h = ?, rotate = ?,
-                       head_crop_x = ?, head_crop_y = ?, head_crop_w = ?, head_crop_h = ? WHERE id = ?')
-            ->execute([$aspect, ...$crop, $rotate, ...$head, $id]);
+                       head_crop_x = ?, head_crop_y = ?, head_crop_w = ?, head_crop_h = ?, use_processed = ? WHERE id = ?')
+            ->execute([$aspect, ...$crop, $rotate, ...$head, $use, $id]);
     } else {
         return null;
     }

@@ -44,6 +44,8 @@ $cookieDoc = doc('cookies');
   <script type="application/ld+json"><?= json_encode($ld, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
 <?php   endif ?>
 <?php endif ?>
+  <?= favicon_tags() ?>
+
   <link rel="preload" href="/assets/fonts/golos-400-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/assets/fonts/playfair-600-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/assets/fonts/fonts.css?v=<?= ENGINE_VERSION ?>">

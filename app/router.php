@@ -15,6 +15,8 @@ function route(string $uri): void
     try {
         db();
         demo_autoload();
+        // Копия базы раз в день — при первом запросе после полуночи (раздел 10.11).
+        backup_daily();
         // Админка — до выбора языка сайта: превью само решает, какие языки включены в правке.
         $admin = $path === '/admin' || str_starts_with($path, '/admin/');
         if (!$admin) {
@@ -22,9 +24,17 @@ function route(string $uri): void
         }
     } catch (Throwable $ex) {
         error_log('[db] ' . $ex->getMessage());
+        // Новый код не поднял базу сразу после замены файлов — вернуть прежнюю версию (раздел 14.2).
+        update_recover_after_failure();
         http_response_code(503);
         header('Retry-After: 60');
         echo view('updating');
+        return;
+    }
+    // Мастер установки (раздел 14.1): /install → /admin/install (там живёт сессия админки).
+    // Чистая установка без наполнения: главная тоже ведёт в мастер.
+    if ($path === '/install' || ($path === '/' && install_open() && site_is_empty())) {
+        admin_redirect('/admin/install');
         return;
     }
     if ($admin) {
@@ -39,6 +49,23 @@ function route(string $uri): void
         return;
     }
 
+    if ($path === '/cron') {
+        header('Content-Type: text/plain');
+        echo "ok\n";
+        return;
+    }
+    if ($path === '/favicon.svg') {
+        favicon_svg();
+        return;
+    }
+    if ($path === '/favicon.ico') {
+        favicon_ico();
+        return;
+    }
+    if ($path === '/site.webmanifest') {
+        web_manifest();
+        return;
+    }
     if ($path === '/robots.txt') {
         robots_txt();
         return;
