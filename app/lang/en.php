@@ -9,6 +9,7 @@ return [
     'error.not_found'            => 'Page not found',
     'error.back_home'            => 'Home',
     'nav.menu'                   => 'Menu',
+    'nav.tabs'                   => 'Sections',
     'nav.language'               => 'Language',
     'nav.back'                   => '← Back',
     'nav.to_list'                => '‹ Back to list',

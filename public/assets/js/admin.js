@@ -6,7 +6,7 @@
   var BOOT = JSON.parse(document.getElementById('boot').textContent);
   var T = BOOT.t;
   var S = { site: null, meta: null, sel: 'set:main', lang: null, dirty: false, open: {}, errors: [], warnings: [],
-            idmap: {}, device: 1280, pvLang: null, pvPath: '/', scrollY: 0, seq: 0, saving: false };
+            idmap: {}, device: 1280, pvLang: null, pvPath: '/', pvHost: '', scrollY: 0, seq: 0, saving: false };
   var tmp = 0;
 
   /* ---------------------------------------------------------------- мелочи */
@@ -54,40 +54,75 @@
 
   /* ---------------------------------------------------------------- индекс дерева */
 
-  // Каждый элемент: где лежит (список и родитель), уровень страницы, путь для формы и превью.
-  var IDX = {};
+  // Каждый элемент: где лежит (список и родитель), уровень страницы, таб, путь для формы и превью.
+  // Ключ выбора — id элемента, у таба — «t» + id (у табов свои номера).
+  var IDX = {}, META = new WeakMap();
   function reindex() {
-    IDX = {};
-    walkBlocks(S.site.blocks, null, 0);
+    IDX = {}; META = new WeakMap();
+    if (!S.site.domains) S.site.domains = [];
+    walkBlocks(S.site.blocks, null, 0, null);
   }
-  function walkBlocks(list, ownerTile, level) {
+  function put(key, entry) { entry.key = String(key); IDX[key] = entry; META.set(entry.node, entry); }
+  function walkBlocks(list, ownerTile, level, tab) {
     list.forEach(function (b) {
-      IDX[b.id] = { node: b, list: list, kind: 'block', tile: ownerTile, level: level };
+      put(b.id, { node: b, list: list, kind: 'block', tile: ownerTile, level: level, tab: tab });
+      if (b.type === 'tabs') {
+        if (!b.tabs) b.tabs = [];
+        b.tabs.forEach(function (tb) {
+          put('t' + tb.id, { node: tb, list: b.tabs, kind: 'tab', block: b, tile: null, level: 0, tab: tb });
+          if (!tb.blocks) tb.blocks = [];
+          walkBlocks(tb.blocks, null, 0, tb);
+        });
+      }
       if (b.type === 'tiles') {
         if (!b.tiles) b.tiles = [];
         b.tiles.forEach(function (tl) {
-          IDX[tl.id] = { node: tl, list: b.tiles, kind: 'tile', block: b, tile: ownerTile, level: level };
+          put(tl.id, { node: tl, list: b.tiles, kind: 'tile', block: b, tile: ownerTile, level: level, tab: tab });
           if (b.kind !== 'wine') {
             if (!tl.blocks) tl.blocks = [];
-            walkBlocks(tl.blocks, tl, level + 1);
+            walkBlocks(tl.blocks, tl, level + 1, tab);
           }
         });
       }
     });
   }
-  function isWine(tile) { var i = IDX[tile.id]; return i && i.block && i.block.kind === 'wine'; }
+  function info(node) { return node ? META.get(node) : null; }
+  function keyOf(node) { var i = info(node); return i ? i.key : String(node.id); }
+  function tabsBlock() { return S.site.blocks.filter(function (b) { return b.type === 'tabs'; })[0] || null; }
+  // Лента элемента: таб или сайт — у неё валюта, формат реквизитов, владелец, карты, цены вин (раздел 3.4).
+  function feedOf(node) { var i = info(node); return (i && i.tab) || S.site.settings; }
+  function tabSlugOf(tb) { return tb.slug || S.idmap['tabslug:' + tb.id] || ''; }
+  // Префикс адреса таба в превью: на адресе одного таба его нет (раздел 4.5).
+  function tabPrefix(tb) {
+    if (!tb) return '';
+    var d = S.site.domains.filter(function (x) { return x.host === S.pvHost; })[0];
+    if (d && d.tab != null) return '';
+    return '/' + tabSlugOf(tb);
+  }
+  function isWine(tile) { var i = info(tile); return i && i.block && i.block.kind === 'wine'; }
   function visibleKids(tl) { return (tl.blocks || []).filter(function (b) { return !b.hidden; }); }
   function hasCoords(tl) { return tl.lat !== null && tl.lat !== '' && tl.lat !== undefined && tl.lng !== null && tl.lng !== '' && tl.lng !== undefined; }
   // Как откроется плитка (раздел 3.2) — подсказка в дереве и форме; точное решение принимает сервер.
   function opens(tl) {
-    var i = IDX[tl.id];
+    var i = info(tl);
     if (isWine(tl)) return tx(tl.text, mainLang()) ? 'popup' : null;
     if (i.level === 0 && (visibleKids(tl).length || tl.as_page)) return visibleKids(tl).length ? 'page' : 'static';
     return (tx(tl.text, mainLang()) || tx(tl.place, mainLang()) || hasCoords(tl)) ? 'popup' : null;
   }
-  function serverId(id) { return S.idmap[id] || id; }
+  function serverId(key) {
+    key = String(key);
+    if (key.charAt(0) === 't') { var tid = key.slice(1); return 't' + (S.idmap['tab:' + tid] || tid); }
+    return S.idmap[key] || key;
+  }
+  // id из превью и из ошибок сервера → ключ выбора в админке (у новых элементов — временный id).
   function clientId(eid) {
-    for (var k in S.idmap) if (String(S.idmap[k]) === String(eid)) return k;
+    eid = String(eid);
+    if (eid.charAt(0) === 't') {
+      var tid = eid.slice(1);
+      for (var t in S.idmap) if (t.indexOf('tab:') === 0 && String(S.idmap[t]) === tid) return 't' + t.slice(4);
+      return eid;
+    }
+    for (var k in S.idmap) if (k.indexOf(':') < 0 && String(S.idmap[k]) === eid) return k;
     return isNaN(+eid) ? eid : +eid;
   }
   function slugOf(tl) { return tl.slug || S.idmap['slug:' + tl.id] || ''; }
@@ -97,11 +132,13 @@
   var TEXT_FIELDS = {
     text: ['eyebrow', 'title', 'subtitle', 'text'], photo: ['caption'], tiles: ['title'],
     tile: ['title', 'subtitle', 'text', 'place', 'seo_title', 'seo_description'], wine: ['title', 'subtitle', 'grape', 'text'],
-    map: ['title'], pay: ['title', 'text', 'button', 'recipient'], service: ['title', 'text', 'price_note', 'button', 'recipient']
+    map: ['title'], pay: ['title', 'text', 'button', 'recipient'], service: ['title', 'text', 'price_note', 'button', 'recipient'],
+    tab: ['title'], tabs: []
   };
   function kindOf(node) {
-    var i = IDX[node.id];
+    var i = info(node);
     if (!i) return null;
+    if (i.kind === 'tab') return 'tab';
     if (i.kind === 'tile') return isWine(node) ? 'wine' : 'tile';
     return node.type;
   }
@@ -174,6 +211,8 @@
   function rowTag(node) {
     var k = kindOf(node);
     if (k === 'tiles') return node.kind === 'wine' ? t('tag.wine', { n: node.tiles.length }) : t('tag.tiles_' + node.size) + ' · ' + node.aspect;
+    if (k === 'tab') return t('tag.tab', { n: tabTileCount(node) });
+    if (k === 'tabs') return t('tag.tabs', { n: node.tabs.length });
     if (k === 'tile') {
       var o = opens(node);
       if (o === 'page') return t('tag.page', { n: visibleKids(node).length });
@@ -195,7 +234,7 @@
     root.appendChild(home);
     root.appendChild(fixedRow('footer', t('tree.footer'), t('tree.all_pages')));
     var set = h('div', { class: 'grp' }, [h('div', { class: 'grp__h' }, [h('span', { text: t('tree.settings') })])]);
-    ['main', 'langs', 'operators', 'docs', 'social'].forEach(function (k) {
+    ['main', 'langs', 'domains', 'operators', 'docs', 'social', 'transfer'].forEach(function (k) {
       set.appendChild(fixedRow('set:' + k, t('set.' + k), ''));
     });
     root.appendChild(set);
@@ -213,6 +252,20 @@
 
   function hasErr(id) {
     return S.errors.some(function (er) { return errKey(er) === String(id); });
+  }
+
+  // Плитки ленты таба на полосе табов: видимые плитки уровня 1 (раздел 5.4).
+  function tabTileCount(tb) {
+    var n = 0;
+    tb.blocks.forEach(function (b) { if (b.type === 'tiles' && !b.hidden) b.tiles.forEach(function (tl) { if (!tl.hidden && tx(tl.title, mainLang())) n++; }); });
+    return n;
+  }
+
+  function tabList(block) {
+    var wrap = h('div', { class: 'kids' });
+    block.tabs.forEach(function (tb, i) { wrap.appendChild(nodeRow(tb, block.tabs, i)); });
+    wrap.appendChild(h('button', { type: 'button', class: 'add', text: '+ ' + t('tree.add_tab'), onclick: function () { addTab(block); } }));
+    return wrap;
   }
 
   function blockList(list, ownerTile) {
@@ -235,19 +288,23 @@
     var k = kindOf(node);
     var kidsFn = null;
     if (k === 'tiles') kidsFn = function () { return tileList(node); };
-    if (k === 'tile' && IDX[node.id].level === 0) kidsFn = function () { return blockList(node.blocks, node); };
-    var isOpen = !!S.open[node.id];
+    if (k === 'tile' && info(node).level === 0) kidsFn = function () { return blockList(node.blocks, node); };
+    if (k === 'tabs') kidsFn = function () { return tabList(node); };
+    if (k === 'tab') kidsFn = function () { return blockList(node.blocks, null); };
+    var key = keyOf(node);
+    var isOpen = !!S.open[key];
+    var fixed = k === 'tabs'; // блок Табы всегда последний: не перетаскивается
     var miss = missingLangs(node);
     var box = h('div', { class: 'node' });
     var photoDot = (k === 'tile' || k === 'wine') ? h('span', { class: 'dot' + (node.photo ? ' is-on' : ''), title: node.photo ? t('tree.has_photo') : t('tree.no_photo') }) : null;
     var row = h('div', {
-      class: 'row' + (S.sel === String(node.id) ? ' is-sel' : '') + (node.hidden ? ' is-hidden' : '') + (hasErr(node.id) ? ' has-err' : ''),
-      draggable: 'true', tabindex: '0', role: 'button', 'data-id': node.id,
-      onclick: function () { select(String(node.id)); }, onkeydown: enterClick
+      class: 'row' + (S.sel === key ? ' is-sel' : '') + (node.hidden ? ' is-hidden' : '') + (hasErr(key) ? ' has-err' : ''),
+      draggable: fixed ? null : 'true', tabindex: '0', role: 'button', 'data-id': key,
+      onclick: function () { select(key); }, onkeydown: enterClick
     }, [
-      h('span', { class: 'row__drag', title: t('tree.drag'), text: '⋮⋮' }),
+      fixed ? h('span', { class: 'row__sp' }) : h('span', { class: 'row__drag', title: t('tree.drag'), text: '⋮⋮' }),
       kidsFn ? h('button', { type: 'button', class: 'row__tog', 'aria-expanded': isOpen ? 'true' : 'false', text: isOpen ? '▾' : '▸',
-        onclick: function (e) { e.stopPropagation(); S.open[node.id] = !isOpen; renderTree(); } }) : photoDot || h('span', { class: 'row__sp' }),
+        onclick: function (e) { e.stopPropagation(); S.open[key] = !isOpen; renderTree(); } }) : photoDot || h('span', { class: 'row__sp' }),
       h('span', { class: 'row__main' }, [
         h('span', { class: 'row__lb' }, [h('b', { text: TYPE_LABEL(node) }), rowTitle(node) ? ' «' + rowTitle(node) + '»' : '']),
         rowTag(node) || miss.length ? h('span', { class: 'row__sub' }, [rowTag(node), miss.length ? h('span', { class: 'row__miss', text: (rowTag(node) ? ' · ' : '') + t('tree.no_translation', { langs: miss.join(', ').toUpperCase() }) }) : null]) : null
@@ -257,7 +314,7 @@
       h('button', { type: 'button', class: 'row__x', title: t('tree.delete'), text: '✕',
         onclick: function (e) { e.stopPropagation(); removeNode(node); } })
     ]);
-    dragSetup(row, list, index);
+    if (!fixed) dragSetup(row, list, index);
     box.appendChild(row);
     if (kidsFn && isOpen) box.appendChild(kidsFn());
     return box;
@@ -283,6 +340,7 @@
       var item = list.splice(drag.index, 1)[0];
       if (drag.index < to) to -= 1;
       list.splice(to, 0, item);
+      keepTabsLast(list);
       drag = null;
       changed();
     });
@@ -293,14 +351,23 @@
 
   /* ---------------------------------------------------------------- добавить и удалить */
 
-  var BLOCK_TYPES = ['text', 'photo', 'tiles', 'map', 'pay', 'service'];
+  var BLOCK_TYPES = ['text', 'photo', 'tiles', 'map', 'pay', 'service', 'tabs'];
+  function keepTabsLast(list) {
+    var i = list.findIndex(function (b) { return b.type === 'tabs'; });
+    if (i >= 0 && i !== list.length - 1) list.push(list.splice(i, 1)[0]);
+  }
   function addBlockMenu(anchor, list, ownerTile) {
     closeMenus();
     var menu = h('div', { class: 'menu', role: 'menu' });
     BLOCK_TYPES.forEach(function (type) {
       var taken = (type === 'map' || type === 'pay') && list.some(function (b) { return b.type === type; });
-      var item = h('button', { type: 'button', role: 'menuitem', disabled: taken, onclick: function () { closeMenus(); addBlock(list, type, ownerTile); } }, [
-        h('b', { text: t('type.' + type) }), h('small', { text: taken ? t('add.taken') : t('add.hint.' + type) })
+      var why = taken ? t('add.taken') : t('add.hint.' + type);
+      if (type === 'tabs') {
+        if (list !== S.site.blocks) { taken = true; why = t('add.only_home'); }
+        else if (tabsBlock()) { taken = true; why = t('add.taken_site'); }
+      }
+      var item = h('button', { type: 'button', role: 'menuitem', disabled: taken, onclick: function () { closeMenus(); if (type === 'tabs') addTabsBlock(); else addBlock(list, type, ownerTile); } }, [
+        h('b', { text: t('type.' + type) }), h('small', { text: why })
       ]);
       menu.appendChild(item);
     });
@@ -324,9 +391,44 @@
   function addBlock(list, type, ownerTile) {
     var b = emptyBlock(type);
     list.push(b);
+    keepTabsLast(list); // на главной новый блок встаёт перед Табами
     if (ownerTile) S.open[ownerTile.id] = true;
     changed();
     select(String(b.id));
+  }
+
+  // Новый таб — с настройками сайта (раздел 10.4).
+  function newTab(title, hidden) {
+    var s = S.site.settings;
+    return { id: newId(), slug: '', title: obj(title), hidden: hidden, currency: s.currency, req_format: s.req_format,
+             operator: s.operator, maps: s.maps, show_prices: s.show_prices, blocks: [] };
+  }
+
+  // Блок Табы на главную: блоки главной — первым табом (по умолчанию) или общими над табами (раздел 10.4).
+  function addTabsBlock() {
+    var home = S.site.blocks;
+    var first = newTab(t('default.new_tab'), false);
+    var finish = function (move) {
+      if (move) { first.blocks = home.splice(0, home.length); }
+      var b = { id: newId(), type: 'tabs', hidden: false, tabs: [first] };
+      home.push(b);
+      S.open[b.id] = true;
+      changed();
+      select('t' + first.id);
+    };
+    if (!home.length) { finish(false); return; }
+    choiceBox(t('tabs.add_title'), t('tabs.add_hint'), [[t('tabs.add_move'), true], [t('tabs.add_keep'), false]]).then(function (v) {
+      if (v !== null) finish(v);
+    });
+  }
+
+  function addTab(block) {
+    var tb = newTab(t('default.new_tab'), true);
+    block.tabs.push(tb);
+    S.open[block.id] = true;
+    changed();
+    select('t' + tb.id);
+    flash(t('tab.created_hidden'), 'warn');
   }
 
   function addTile(block) {
@@ -342,20 +444,34 @@
 
   function countInside(node) {
     var n = 0;
+    (node.tabs || []).forEach(function (tb) { n += 1 + countInside(tb); });
     (node.tiles || []).forEach(function (tl) { n += 1 + countInside(tl); });
     (node.blocks || []).forEach(function (b) { n += 1 + countInside(b); });
     return n;
   }
 
   function removeNode(node) {
+    var k = kindOf(node);
+    // Блок Табы удаляется, только когда таб один: его лента становится лентой главной (раздел 10.4).
+    if (k === 'tabs' && node.tabs.length > 1) { alertBox(t('tabs.delete_many')); return; }
     var name = rowTitle(node) || TYPE_LABEL(node);
-    var inside = countInside(node);
+    var inside = k === 'tabs' ? 0 : countInside(node);
     var msg = inside ? t('delete.confirm_all', { name: name, n: inside }) : t('delete.confirm', { name: name });
-    confirmBox(msg, t('delete.hint'), t('tree.delete'), true).then(function (ok) {
+    var hint = k === 'tabs' && node.tabs.length ? t('tabs.delete_one') : t('delete.hint');
+    confirmBox(msg, hint, t('tree.delete'), true).then(function (ok) {
       if (!ok) return;
-      var i = IDX[node.id];
-      i.list.splice(i.list.indexOf(node), 1);
-      if (S.sel === String(node.id)) S.sel = i.tile ? String(i.tile.id) : (i.block ? String(i.block.id) : 'header');
+      var i = info(node);
+      var at = i.list.indexOf(node);
+      i.list.splice(at, 1);
+      if (k === 'tabs' && node.tabs.length) {
+        var tb = node.tabs[0], s = S.site.settings;
+        Array.prototype.push.apply(S.site.blocks, tb.blocks);
+        ['currency', 'req_format', 'operator', 'maps', 'show_prices'].forEach(function (f) { s[f] = tb[f]; });
+      }
+      // Адрес удалённого таба показывает весь сайт.
+      var gone = k === 'tabs' ? node.tabs : (k === 'tab' ? [node] : []);
+      S.site.domains.forEach(function (d) { if (gone.some(function (tb) { return String(tb.id) === String(d.tab); })) d.tab = null; });
+      if (S.sel === i.key) S.sel = i.tile ? keyOf(i.tile) : (i.block ? keyOf(i.block) : (i.tab ? keyOf(i.tab) : 'header'));
       changed();
       renderForm();
     });
@@ -365,19 +481,20 @@
 
   function select(key) {
     S.sel = String(key);
-    var i = IDX[isNaN(+key) ? key : +key] || IDX[key];
-    // Раскрыть родителей выбранного.
-    if (i) {
-      if (i.block) S.open[i.block.id] = true;
-      if (i.tile) S.open[i.tile.id] = true;
-      var up = i.tile && IDX[i.tile.id];
-      if (up && up.block) S.open[up.block.id] = true;
-    }
+    openParents(IDX[isNaN(+key) ? key : +key] || IDX[key]);
     renderTree();
     renderForm();
     var path = previewPathFor(key);
     if (path !== S.pvPath) { S.pvPath = path; S.scrollY = 0; loadPreview(); }
     else highlight();
+  }
+
+  // Раскрыть в дереве родителей выбранного: блок, плитку, таб и блок Табы.
+  function openParents(i) {
+    if (!i) return;
+    if (i.block) S.open[keyOf(i.block)] = true;
+    if (i.tile) { S.open[keyOf(i.tile)] = true; openParents(info(i.tile)); return; }
+    if (i.kind !== 'tab' && i.tab) { S.open[keyOf(i.tab)] = true; openParents(info(i.tab)); }
   }
 
   function selected() {
@@ -427,6 +544,8 @@
     if (id === 'social') return 'set:social';
     if (id === 'operators') return 'set:operators';
     if (id === 'languages') return 'set:langs';
+    if (id === 'domains') return 'set:domains';
+    if (typeof id === 'string' && id.indexOf('tab:') === 0) return String(clientId('t' + id.slice(4)));
     return id == null ? '' : String(clientId(id));
   }
 
@@ -499,7 +618,8 @@
   }
 
   function fieldErr(node, key) {
-    var er = S.errors.filter(function (e) { return errKey(e) === String(node && node.id) && e.field === key && (!e.lang || e.lang === S.lang); })[0];
+    var nk = node && info(node) ? keyOf(node) : String(node && node.id);
+    var er = S.errors.filter(function (e) { return errKey(e) === nk && e.field === key && (!e.lang || e.lang === S.lang); })[0];
     return er ? t(er.code, { n: er.n }) : null;
   }
 
@@ -554,7 +674,8 @@
 
   function pathOf(node) {
     var parts = [t('tree.home')];
-    var i = IDX[node.id];
+    var i = info(node);
+    if (i && i.tab && i.kind !== 'tab') parts.push(txAny(i.tab.title) || t('type.tab'));
     if (i && i.tile) parts.push(txAny(i.tile.title) || t('type.tile'));
     return parts.join(' / ');
   }
@@ -562,12 +683,13 @@
   function formElement(root, node) {
     var k = kindOf(node);
     formHead(root, TYPE_LABEL(node), pathOf(node), node);
-    langTabs(root, node);
+    if ((TEXT_FIELDS[k] || []).length) langTabs(root, node);
     var M = S.meta.max[k] || {};
     var f = h('div', { class: 'fbody' });
     root.appendChild(f);
     FORMS[k](f, node, M);
-    root.appendChild(h('div', { class: 'ffoot' }, [h('button', { type: 'button', class: 'btn btn--danger', text: t('tree.delete'), onclick: function () { removeNode(node); } })]));
+    var del = k === 'tab' ? t('tab.delete_all', { n: countInside(node) }) : t('tree.delete');
+    root.appendChild(h('div', { class: 'ffoot' }, [h('button', { type: 'button', class: 'btn btn--danger', text: del, onclick: function () { removeNode(node); } })]));
   }
 
   var FORMS = {
@@ -607,7 +729,7 @@
       f.appendChild(h('button', { type: 'button', class: 'btn btn--ghost', text: '+ ' + t(b.kind === 'wine' ? 'tree.add_wine' : 'tree.add_tile'), onclick: function () { addTile(b); } }));
     },
     tile: function (f, tl, M) {
-      var i = IDX[tl.id];
+      var i = info(tl);
       var aspect = i.block.aspect || '4:5';
       f.appendChild(photoField(tl, 'photo', aspect));
       f.appendChild(textField(tl, 'title', t('field.name'), M.title));
@@ -630,7 +752,7 @@
       f.appendChild(h('p', { class: 'opens' }, [t('form.opens_now') + ' ', h('b', { text: t('opens.' + (o || 'none')) })]));
       if (o === 'page' || o === 'static') {
         f.appendChild(h('button', { type: 'button', class: 'btn btn--ghost', text: t('form.go_page'), onclick: function () {
-          S.open[tl.id] = true; S.pvPath = '/' + slugOf(tl); S.scrollY = 0; renderTree(); loadPreview();
+          S.open[tl.id] = true; S.pvPath = tabPrefix(i.tab) + '/' + slugOf(tl); S.scrollY = 0; renderTree(); loadPreview();
         } }));
         if (tl.photo) f.appendChild(headPhotoField(tl));
       } else if (o === 'popup') {
@@ -649,9 +771,43 @@
       f.appendChild(textField(tl, 'grape', t('field.grape'), M.grape));
       f.appendChild(h('div', { class: 'two' }, [
         plainField(tl, 'vintage', t('field.vintage'), { number: true, inputmode: 'numeric', placeholder: '2019' }),
-        plainField(tl, 'price', t('field.price') + ' (' + S.site.settings.currency + ')', { number: true, inputmode: 'decimal', hint: S.site.settings.show_prices ? t('hint.price_on') : t('hint.price_off') })
+        plainField(tl, 'price', t('field.price') + ' (' + feedOf(tl).currency + ')', { number: true, inputmode: 'decimal', hint: feedOf(tl).show_prices ? t('hint.price_on') : t('hint.price_off') })
       ]));
       f.appendChild(textField(tl, 'text', t('field.wine_text'), M.text, { area: true, rows: 6, hint: t('hint.wine_text') }));
+    },
+    tabs: function (f, b) {
+      f.appendChild(h('p', { class: 'hint', text: t('hint.tabs') }));
+      var ul = h('ul', { class: 'plist' });
+      b.tabs.forEach(function (tb) {
+        ul.appendChild(h('li', {}, [h('button', { type: 'button', class: 'linkbtn', text: (txAny(tb.title) || t('type.tab')) + (tb.hidden ? ' · ' + t('tab.hidden') : ''), onclick: function () { select('t' + tb.id); } })]));
+      });
+      f.appendChild(ul);
+      f.appendChild(h('button', { type: 'button', class: 'btn btn--ghost', text: '+ ' + t('tree.add_tab'), onclick: function () { addTab(b); } }));
+      f.appendChild(section(t('sec.tab_import')));
+      f.appendChild(fileButton(t('tab.import'), '.zip,application/zip', function (file) {
+        var fd = new FormData();
+        fd.append('file', file);
+        setBusy(t('transfer.reading'));
+        api('POST', 'import_tab', fd, true).then(function (j) {
+          setBusy(null);
+          if (!j.tab) { alertBox(importError(j)); return; }
+          addImportedTab(b, j);
+        }).catch(function () { setBusy(null); alertBox(t('transfer.failed')); });
+      }, t('hint.tab_import')));
+    },
+    tab: function (f, tb, M) {
+      var isNew = typeof tb.id !== 'number';
+      f.appendChild(textField(tb, 'title', t('field.tab_title'), M.title, { hint: t('hint.tab_title') }));
+      var slugIn = h('input', { type: 'text', 'data-field': 'slug', maxlength: '40', readonly: !isNew, placeholder: slugify(tx(tb.title, mainLang())) });
+      slugIn.value = isNew ? (tb.slug || '') : tb.slug;
+      slugIn.addEventListener('input', function () { tb.slug = slugIn.value.trim().toLowerCase(); changed(); });
+      f.appendChild(field(t('field.slug'), slugIn, isNew ? t('hint.slug_new') : t('hint.slug_fixed'), null, fieldErr(tb, 'slug')));
+      f.appendChild(section(t('sec.money')));
+      feedFields(f, tb);
+      f.appendChild(h('p', { class: 'hint' }, [t('hint.tab_domain') + ' ', h('button', { type: 'button', class: 'linkbtn', text: t('set.domains'), onclick: function () { select('set:domains'); } })]));
+      f.appendChild(section(t('sec.tab_export')));
+      if (isNew) f.appendChild(h('p', { class: 'hint', text: t('hint.tab_export_unsaved') }));
+      else f.appendChild(h('a', { class: 'btn btn--ghost', href: '/admin/api/export?tab=' + tb.id, text: t('tab.export') }));
     },
     map: function (f, b, M) {
       f.appendChild(textField(b, 'title', t('field.title'), M.title));
@@ -674,7 +830,7 @@
       f.appendChild(textField(b, 'title', t('field.title'), M.title, { placeholder: t('ph.service_title') }));
       f.appendChild(textField(b, 'text', t('field.text'), M.text, { area: true, rows: 4 }));
       f.appendChild(h('div', { class: 'two' }, [
-        plainField(b, 'price', t('field.price') + ' (' + S.site.settings.currency + ')', { number: true, inputmode: 'decimal', hint: t('hint.price_empty') }),
+        plainField(b, 'price', t('field.price') + ' (' + feedOf(b).currency + ')', { number: true, inputmode: 'decimal', hint: t('hint.price_empty') }),
         textField(b, 'price_note', t('field.price_note'), M.price_note, { placeholder: t('ph.price_note') })
       ]));
       f.appendChild(textField(b, 'button', t('field.button'), M.button));
@@ -692,8 +848,8 @@
   }
 
   function mapPoints(b) {
-    var i = IDX[b.id];
-    var blocks = i.tile ? i.tile.blocks : S.site.blocks;
+    var i = info(b);
+    var blocks = i.tile ? i.tile.blocks : (i.tab ? i.tab.blocks : S.site.blocks);
     var out = [];
     blocks.forEach(function (bl) {
       if (bl.type !== 'tiles' || bl.hidden) return;
@@ -709,8 +865,8 @@
   }
 
   function popupPath(tl) {
-    var i = IDX[tl.id];
-    return (i.tile ? '/' + slugOf(i.tile) : '') + '/' + (slugOf(tl) || '');
+    var i = info(tl);
+    return tabPrefix(i.tab) + (i.tile ? '/' + slugOf(i.tile) : '') + '/' + (slugOf(tl) || '');
   }
 
   /* ---------------------------------------------------------------- шапка, подвал, настройки */
@@ -723,7 +879,8 @@
     var f = h('div', { class: 'fbody' });
     f.appendChild(textField(S.site.settings, 'site_title', t('field.site_title'), S.meta.max.settings.site_title, { onInput: function () { $('[data-site-name]').textContent = txAny(S.site.settings.site_title); } }));
     var n = 0;
-    S.site.blocks.forEach(function (b) { if (b.type === 'tiles' && !b.hidden && b.kind !== 'wine') b.tiles.forEach(function (tl) { if (!tl.hidden && opens(tl)) n++; }); });
+    var tb = tabsBlock(), first = tb && !tb.hidden && tb.tabs.filter(function (x) { return !x.hidden; })[0];
+    S.site.blocks.concat(first ? first.blocks : []).forEach(function (b) { if (b.type === 'tiles' && !b.hidden && b.kind !== 'wine') b.tiles.forEach(function (tl) { if (!tl.hidden && opens(tl)) n++; }); });
     var shown = hd.burger === 'on' ? n > 0 : hd.burger === 'off' ? false : n > 6;
     f.appendChild(seg(t('field.burger'), [['auto', t('burger.auto')], ['on', t('burger.on')], ['off', t('burger.off')]], hd.burger, function (v) { hd.burger = v; changed(); renderForm(); },
       t(shown ? 'hint.burger_shown' : 'hint.burger_hidden', { n: n })));
@@ -743,6 +900,69 @@
     root.appendChild(f);
   }
 
+  // Настройки «страны» ленты: у сайта без табов и у каждого таба одинаковые (раздел 3.4).
+  function feedFields(f, s) {
+    f.appendChild(h('div', { class: 'two' }, [
+      select_(t('field.currency'), [['RUB', 'RUB ₽'], ['GEL', 'GEL ₾'], ['EUR', 'EUR €'], ['USD', 'USD $']], s.currency, function (v) { s.currency = v; changed(); }),
+      select_(t('field.req_format'), [['RU', t('fmt.RU')], ['GE', t('fmt.GE')], ['other', t('fmt.other')]], s.req_format, function (v) { s.req_format = v; changed(); renderForm(); })
+    ]));
+    f.appendChild(select_(t('field.operator'), [[null, '—']].concat(S.site.operators.map(function (o) { return [o.id, o.name || '—']; })), s.operator, function (v) {
+      s.operator = v === null ? null : (isNaN(+v) ? v : +v); changed();
+    }, t('hint.operator')));
+    f.appendChild(seg(t('field.maps'), [['google', 'Google'], ['yandex', t('maps.yandex')]], s.maps, function (v) { s.maps = v; changed(); renderForm(); }, t('hint.maps')));
+    f.appendChild(toggle(t('field.show_prices'), s.show_prices, function (v) { s.show_prices = v; changed(); }));
+  }
+
+  // Slug из названия — так же, как на сервере (раздел 4.4); здесь только подсказка.
+  var TR = { 'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e', 'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+    'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'h', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch', 'ъ': '', 'ы': 'y',
+    'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya', 'ა': 'a', 'ბ': 'b', 'გ': 'g', 'დ': 'd', 'ე': 'e', 'ვ': 'v', 'ზ': 'z', 'თ': 't', 'ი': 'i', 'კ': 'k', 'ლ': 'l',
+    'მ': 'm', 'ნ': 'n', 'ო': 'o', 'პ': 'p', 'ჟ': 'zh', 'რ': 'r', 'ს': 's', 'ტ': 't', 'უ': 'u', 'ფ': 'p', 'ქ': 'k', 'ღ': 'gh', 'ყ': 'q', 'შ': 'sh',
+    'ჩ': 'ch', 'ც': 'ts', 'ძ': 'dz', 'წ': 'ts', 'ჭ': 'ch', 'ხ': 'kh', 'ჯ': 'j', 'ჰ': 'h' };
+  function slugify(s) {
+    return String(s || '').toLowerCase().split('').map(function (c) { return TR[c] != null ? TR[c] : c; }).join('')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+  }
+
+  function fileButton(label, accept, onFile, hint) {
+    var input = h('input', { type: 'file', accept: accept, hidden: true });
+    input.addEventListener('change', function () { var f = input.files[0]; input.value = ''; if (f) onFile(f); });
+    return h('div', { class: 'fld' }, [h('button', { type: 'button', class: 'btn btn--ghost', text: label, onclick: function () { input.click(); } }), input,
+      hint ? h('small', { class: 'hint', text: hint }) : null]);
+  }
+
+  function importError(j) {
+    var list = (j.errors || []).map(function (er) { return problemText(er); });
+    return list.length ? t('transfer.check_failed') + '\n' + list.slice(0, 8).join('\n') : t(j.error || 'transfer.failed');
+  }
+
+  // Загрузить таб: новым скрытым табом; slug с «-2» при совпадении; владелец — если такого ещё нет (раздел 13).
+  function addImportedTab(block, j) {
+    var tb = j.tab;
+    tb.id = newId();
+    tb.hidden = true;
+    var used = block.tabs.map(tabSlugOf), base = tb.slug || '', sl = base, n = 1;
+    while (sl && used.indexOf(sl) >= 0) sl = base + '-' + (++n);
+    tb.slug = sl;
+    tb.operator = null;
+    if (j.operator) {
+      var op = S.site.operators.filter(function (o) { return o.name === j.operator.name && (o.tax_id || '') === (j.operator.tax_id || ''); })[0];
+      if (!op) { op = Object.assign({}, j.operator, { id: newId() }); S.site.operators.push(op); }
+      tb.operator = op.id;
+    }
+    (function renew(list) {
+      list.forEach(function (b) {
+        b.id = newId();
+        (b.methods || []).forEach(function (m) { m.id = newId(); });
+        (b.tiles || []).forEach(function (tl) { tl.id = newId(); delete tl.slug; renew(tl.blocks || []); });
+      });
+    })(tb.blocks || []);
+    block.tabs.push(tb);
+    changed();
+    select('t' + tb.id);
+    flash(t('tab.imported'), 'warn');
+  }
+
   var FORMS_SET = {
     main: function (root) {
       var s = S.site.settings;
@@ -755,15 +975,8 @@
       f.appendChild(textField(s, 'seo_title', t('field.seo_title'), M.seo_title));
       f.appendChild(textField(s, 'seo_description', t('field.seo_description'), M.seo_description, { area: true, rows: 3 }));
       f.appendChild(section(t('sec.money')));
-      f.appendChild(h('div', { class: 'two' }, [
-        select_(t('field.currency'), [['RUB', 'RUB ₽'], ['GEL', 'GEL ₾'], ['EUR', 'EUR €'], ['USD', 'USD $']], s.currency, function (v) { s.currency = v; changed(); }),
-        select_(t('field.req_format'), [['RU', t('fmt.RU')], ['GE', t('fmt.GE')], ['other', t('fmt.other')]], s.req_format, function (v) { s.req_format = v; changed(); renderForm(); })
-      ]));
-      f.appendChild(select_(t('field.operator'), [[null, '—']].concat(S.site.operators.map(function (o) { return [o.id, o.name || '—']; })), s.operator, function (v) {
-        s.operator = v === null ? null : (isNaN(+v) ? v : +v); changed();
-      }, t('hint.operator')));
-      f.appendChild(seg(t('field.maps'), [['google', 'Google'], ['yandex', t('maps.yandex')]], s.maps, function (v) { s.maps = v; changed(); renderForm(); }, t('hint.maps')));
-      f.appendChild(toggle(t('field.show_prices'), s.show_prices, function (v) { s.show_prices = v; changed(); }));
+      if (tabsBlock()) f.appendChild(h('p', { class: 'hint hint--warn', text: t('hint.main_with_tabs') }));
+      feedFields(f, s);
       f.appendChild(toggle(t('field.cookie_notice'), s.cookie_notice, function (v) { s.cookie_notice = v; changed(); }));
       root.appendChild(f);
     },
@@ -791,6 +1004,56 @@
         ]);
         f.appendChild(row);
       });
+      root.appendChild(f);
+    },
+    domains: function (root) {
+      formHead(root, t('set.domains'), t('tree.settings'));
+      langTabs(root, null);
+      var f = h('div', { class: 'fbody' });
+      f.appendChild(h('p', { class: 'hint', text: t('hint.domains') }));
+      var tb = tabsBlock();
+      var shows = [[null, t('domain.all')]].concat(tb ? tb.tabs.map(function (x) { return [x.id, t('domain.only', { tab: txAny(x.title) || '—' })]; }) : []);
+      S.site.domains.forEach(function (d, i) {
+        if (!d.site_title || typeof d.site_title !== 'object') d.site_title = {};
+        var box = h('div', { class: 'card' });
+        box.appendChild(plainField(d, 'host', t('field.host'), { placeholder: 'example.ru', onInput: renderPreviewBar }));
+        box.appendChild(select_(t('field.domain_shows'), shows, d.tab, function (v) { d.tab = v === null ? null : (isNaN(+v) ? v : +v); changed(); }));
+        box.appendChild(textField(d, 'site_title', t('field.domain_title'), S.meta.max.domain.site_title, { placeholder: txAny(S.site.settings.site_title) }));
+        box.appendChild(h('button', { type: 'button', class: 'btn btn--danger btn--small', text: t('tree.delete'), onclick: function () {
+          S.site.domains.splice(i, 1); changed(); renderForm(); renderPreviewBar();
+        } }));
+        f.appendChild(box);
+      });
+      f.appendChild(h('button', { type: 'button', class: 'btn btn--ghost', text: '+ ' + t('domain.add'), onclick: function () {
+        S.site.domains.push({ host: '', tab: null, site_title: {} }); changed(); renderForm();
+      } }));
+      root.appendChild(f);
+    },
+    transfer: function (root) {
+      formHead(root, t('set.transfer'), t('tree.settings'));
+      var f = h('div', { class: 'fbody' });
+      f.appendChild(section(t('transfer.export')));
+      var structure = false;
+      f.appendChild(toggle(t('transfer.structure'), false, function (v) { structure = v; }, t('hint.structure')));
+      f.appendChild(h('button', { type: 'button', class: 'btn btn--ghost', text: t('transfer.export_btn'), onclick: function () {
+        location.href = '/admin/api/export' + (structure ? '?structure=1' : '');
+      } }));
+      f.appendChild(h('p', { class: 'hint' + (S.dirty ? ' hint--warn' : ''), text: S.dirty ? t('hint.export_unsaved') : t('hint.export') }));
+      f.appendChild(section(t('transfer.import')));
+      f.appendChild(fileButton(t('transfer.import_btn'), '.zip,application/zip', function (file) {
+        confirmBox(t('transfer.replace'), t('transfer.replace_hint'), t('transfer.import_btn'), true).then(function (ok) {
+          if (!ok) return;
+          var fd = new FormData();
+          fd.append('file', file);
+          setBusy(t('transfer.reading'));
+          api('POST', 'import', fd, true).then(function (j) {
+            setBusy(null);
+            if (!j.ok) { alertBox(importError(j)); return; }
+            S.dirty = false;
+            location.reload();
+          }).catch(function () { setBusy(null); alertBox(t('transfer.failed')); });
+        });
+      }, t('hint.import')));
       root.appendChild(f);
     },
     operators: function (root) {
@@ -897,7 +1160,7 @@
         card.appendChild(qrField(m));
       } else if (m.kind === 'requisites') {
         m.req = m.req && typeof m.req === 'object' ? m.req : {};
-        var fmt = S.site.settings.req_format;
+        var fmt = feedOf(b).req_format;
         REQ_FIELDS[fmt].forEach(function (k) { card.appendChild(plainField(m.req, k, t('req.' + (fmt === 'other' && k === 'iban' ? 'iban_account' : k)))); });
         if (!m.req.purpose || typeof m.req.purpose !== 'object') m.req.purpose = {};
         card.appendChild(textField(m.req, 'purpose', t('req.purpose'), 140, { placeholder: t('req.purpose_default') }));
@@ -906,7 +1169,7 @@
     });
     var addBtn = h('button', { type: 'button', class: 'btn btn--ghost', text: '+ ' + t('pay.add'), onclick: function (e) {
       closeMenus();
-      var fmt = S.site.settings.req_format;
+      var fmt = feedOf(b).req_format;
       var menu = h('div', { class: 'menu', role: 'menu' });
       Object.keys(S.meta.providers).forEach(function (code) {
         var p = S.meta.providers[code];
@@ -1128,6 +1391,14 @@
       });
       bar2.appendChild(ls);
     }
+    var hosts = S.site.domains.filter(function (d) { return d.host; });
+    if (hosts.length) {
+      if (!hosts.some(function (d) { return d.host === S.pvHost; })) S.pvHost = hosts[0].host;
+      var hs = h('select', { class: 'pv__host', title: t('preview.address') });
+      hosts.forEach(function (d) { var o = h('option', { value: d.host, text: d.host }); if (d.host === S.pvHost) o.selected = true; hs.appendChild(o); });
+      hs.addEventListener('change', function () { S.pvHost = hs.value; S.pvPath = '/'; S.scrollY = 0; loadPreview(); });
+      bar2.appendChild(hs);
+    } else S.pvHost = '';
     bar2.appendChild(h('button', { type: 'button', class: 'btn btn--ghost btn--small', text: '⌂ ' + t('preview.home'), onclick: function () { S.pvPath = '/'; S.scrollY = 0; loadPreview(); } }));
     fitPreview();
   }
@@ -1164,17 +1435,18 @@
     if (!i) return key === 'footer' || key === 'header' || key.indexOf('set:') === 0 ? S.pvPath : '/';
     if (i.kind === 'tile') {
       var o = opens(i.node);
-      if (o === 'page' || o === 'static') return '/' + slugOf(i.node);
+      if (o === 'page' || o === 'static') return tabPrefix(i.tab) + '/' + slugOf(i.node);
       if (o === 'popup' && slugOf(i.node)) return popupPath(i.node);
     }
-    return i.tile ? '/' + slugOf(i.tile) : '/';
+    if (i.tile) return tabPrefix(i.tab) + '/' + slugOf(i.tile);
+    return tabPrefix(i.tab) || '/';
   }
 
   function loadPreview() {
     var frames = document.querySelectorAll('.pv__frame');
     if (!frames.length) return;
     var front = $('.pv__frame:not(.is-back)'), back = $('.pv__frame.is-back');
-    var url = '/admin/preview?path=' + encodeURIComponent(S.pvPath) + '&lang=' + encodeURIComponent(S.pvLang || '') + '&y=' + Math.round(S.scrollY) + '&r=' + (++S.seq);
+    var url = '/admin/preview?path=' + encodeURIComponent(S.pvPath) + '&lang=' + encodeURIComponent(S.pvLang || '') + '&host=' + encodeURIComponent(S.pvHost || '') + '&y=' + Math.round(S.scrollY) + '&r=' + (++S.seq);
     back.onload = function () {
       back.onload = null;
       back.classList.remove('is-back'); back.removeAttribute('aria-hidden'); back.removeAttribute('tabindex');
@@ -1199,8 +1471,7 @@
       var id = clientId(d.eid);
       if (String(id) !== S.sel && (IDX[id] || d.eid === 'header' || d.eid === 'footer')) {
         S.sel = String(id);
-        var i = IDX[id];
-        if (i) { if (i.block) S.open[i.block.id] = true; if (i.tile) S.open[i.tile.id] = true; }
+        openParents(IDX[id]);
         renderTree(); renderForm(); highlight(true);
       }
     }
@@ -1229,9 +1500,13 @@
         return;
       }
       var ids = j.ids || {};
-      var sel = S.sel;
-      if (ids[sel]) sel = String(ids[sel]);
-      Object.keys(S.open).forEach(function (k) { if (ids[k]) S.open[ids[k]] = S.open[k]; });
+      // Временные id новых элементов и табов → настоящие.
+      var real = function (k) {
+        if (k.charAt(0) === 't' && ids['tab:' + k.slice(1)]) return 't' + ids['tab:' + k.slice(1)];
+        return ids[k] ? String(ids[k]) : k;
+      };
+      var sel = real(S.sel);
+      Object.keys(S.open).forEach(function (k) { if (real(k) !== k) S.open[real(k)] = S.open[k]; });
       S.site = j.site;
       S.idmap = {};
       S.errors = [];
@@ -1279,9 +1554,27 @@
       $('.mbox .btn:last-child', ov).focus();
     });
   }
+  // Окно с выбором из нескольких вариантов; null — «Отмена».
+  function choiceBox(title, text, options) {
+    return new Promise(function (resolve) {
+      var ov;
+      function done(v) { document.removeEventListener('keydown', key); ov.remove(); resolve(v); }
+      function key(e) { if (e.key === 'Escape') done(null); }
+      ov = h('div', { class: 'mo' }, [h('div', { class: 'mbox', role: 'alertdialog', 'aria-modal': 'true' }, [
+        h('h3', { text: title }), text ? h('p', { text: text }) : null,
+        h('div', { class: 'mbox__choices' }, options.map(function (o, i) {
+          return h('button', { type: 'button', class: 'btn ' + (i ? 'btn--ghost' : 'btn--action'), text: o[0], onclick: function () { done(o[1]); } });
+        })),
+        h('div', { class: 'mbox__acts' }, [h('button', { type: 'button', class: 'btn btn--ghost', text: t('btn.cancel'), onclick: function () { done(null); } })])
+      ])]);
+      document.body.appendChild(ov);
+      document.addEventListener('keydown', key);
+      $('.mbox__choices .btn', ov).focus();
+    });
+  }
   function alertBox(text) {
     var ov = h('div', { class: 'mo' }, [h('div', { class: 'mbox', role: 'alertdialog', 'aria-modal': 'true' }, [
-      h('p', { text: text }), h('div', { class: 'mbox__acts' }, [h('button', { type: 'button', class: 'btn btn--action', text: 'OK', onclick: function () { ov.remove(); } })])
+      h('p', { class: 'mbox__text', text: text }), h('div', { class: 'mbox__acts' }, [h('button', { type: 'button', class: 'btn btn--action', text: 'OK', onclick: function () { ov.remove(); } })])
     ])]);
     document.body.appendChild(ov);
     $('.btn', ov).focus();

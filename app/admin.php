@@ -281,6 +281,15 @@ function admin_api(string $name, string $method, array $admin): void
         case 'POST profile':
             admin_profile($admin, admin_input());
             return;
+        case 'GET export':
+            admin_export();
+            return;
+        case 'POST import':
+            admin_import(false);
+            return;
+        case 'POST import_tab':
+            admin_import(true);
+            return;
     }
     admin_json(['error' => 'not_found'], 404);
 }
@@ -336,6 +345,42 @@ function admin_save(array $in): void
     admin_json(['ok' => true, 'ids' => (object) $ids, 'warnings' => $check['warnings'], 'site' => site_export()]);
 }
 
+/* ---------------------------------------------------------------- выгрузка и загрузка (раздел 13) */
+
+function admin_export(): void
+{
+    $tab = isset($_GET['tab']) ? (int) $_GET['tab'] : null;
+    $file = export_zip(!empty($_GET['structure']), $tab);
+    if (!$file) {
+        admin_json(['error' => 'not_found'], 404);
+        return;
+    }
+    $host = request_host() ?: 'site';
+    $name = $host . ($tab ? '-tab-' . $tab : '') . (!empty($_GET['structure']) ? '-structure' : '') . '-' . date('Y-m-d') . '.zip';
+    header('Content-Type: application/zip');
+    header('Content-Disposition: attachment; filename="' . $name . '"');
+    header('Content-Length: ' . filesize($file));
+    readfile($file);
+    unlink($file);
+}
+
+function admin_import(bool $tab): void
+{
+    $f = $_FILES['file'] ?? null;
+    if (!$f || $f['error'] !== UPLOAD_ERR_OK) {
+        admin_json(['ok' => false, 'error' => ($f['error'] ?? 0) === UPLOAD_ERR_INI_SIZE ? 'transfer.too_big' : 'transfer.failed'], 400);
+        return;
+    }
+    try {
+        $res = $tab ? import_zip_tab($f['tmp_name']) : import_zip_site($f['tmp_name']);
+    } catch (Throwable $ex) {
+        error_log('[import] ' . $ex->getMessage());
+        $res = ['ok' => false, 'error' => 'transfer.failed'];
+    }
+    $bad = $tab ? !isset($res['tab']) : empty($res['ok']);
+    admin_json($res, $bad ? 422 : 200);
+}
+
 /* ---------------------------------------------------------------- превью */
 
 /**
@@ -387,6 +432,11 @@ function admin_preview_page(): void
         }
         setting_reset();
         preview_mode(true);
+        // Над превью выбран адрес: сайт рисуется так, как на нём (раздел 4.5).
+        $host = (string) ($_GET['host'] ?? '');
+        if ($host !== '') {
+            current_domain($host);
+        }
         $langs = array_column(site_languages(), 'code');
         current_lang(in_array($lang, $langs, true) ? $lang : default_lang());
         $_SERVER['REQUEST_URI'] = url($path);

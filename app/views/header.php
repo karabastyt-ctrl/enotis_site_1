@@ -6,7 +6,7 @@ $langs = site_languages();
 $logo = setting('logo_path');
 $withTitle = !$logo || setting('logo_with_title', '1') === '1';
 $menu = [];
-foreach (tiles_in(home_blocks()) as $t) {
+foreach (tiles_in(home_feed_blocks()) as $t) {
     if (!is_wine($t) && tile_opens($t)) {
         $menu[] = $t;
     }
@@ -44,7 +44,7 @@ $plain = preg_replace('~^/(' . implode('|', LANGS) . ')(?=/|$)~', '', $here) ?: 
       <summary aria-label="<?= e(t('nav.menu')) ?>"><span class="menu__icon" aria-hidden="true">☰</span></summary>
       <nav class="menu__list">
 <?php   foreach ($menu as $t): ?>
-        <a href="<?= e(tile_url($t)) ?>"<?= tile_opens($t) === 'popup' ? ' data-popup-link="' . e($t['slug']) . '"' : '' ?>><?= e($t['title']) ?></a>
+        <a href="<?= e(tile_url($t)) ?>"<?= tile_opens($t) === 'popup' ? ' data-popup-link="' . (int) $t['id'] . '"' : '' ?>><?= e($t['title']) ?></a>
 <?php   endforeach ?>
       </nav>
     </details>

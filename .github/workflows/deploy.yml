@@ -57,6 +57,16 @@ jobs:
           tests/admin-smoke.sh http://127.0.0.1:8081
           # Предупреждения нашего кода (строку про JIT пишет сам PHP раннера — её пропускаем).
           if grep -E 'PHP (Warning|Notice|Deprecated|Fatal)' /tmp/php-sample.log | grep -v 'JIT'; then exit 1; fi
+      - name: Агрегатор с табами, адресами и ZIP
+        env:
+          ENOTIS_DATA: /tmp/enotis-aggregator
+        run: |
+          mkdir -p "$ENOTIS_DATA"
+          php bin/import.php tests/fixtures/aggregator/site.json
+          php -S 127.0.0.1:8082 -t public public/index.php >/tmp/php-agg.log 2>&1 &
+          sleep 1
+          tests/tabs-smoke.sh http://127.0.0.1:8082
+          if grep -E 'PHP (Warning|Notice|Deprecated|Fatal)' /tmp/php-agg.log | grep -v 'JIT'; then exit 1; fi
 
   deploy:
     needs: check

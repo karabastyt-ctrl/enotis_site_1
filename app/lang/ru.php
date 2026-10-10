@@ -10,6 +10,7 @@ return [
     'error.not_found'            => 'Страница не найдена',
     'error.back_home'            => 'На главную',
     'nav.menu'                   => 'Меню',
+    'nav.tabs'                   => 'Разделы',
     'nav.language'               => 'Язык',
     'nav.back'                   => '← Назад',
     'nav.to_list'                => '‹ К списку',

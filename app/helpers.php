@@ -67,11 +67,11 @@ function url(string $path = '/', ?string $lang = null): string
     return '/' . $lang . ($path === '/' ? '/' : $path);
 }
 
-/** Полный адрес для canonical, og:url и hreflang. */
-function abs_url(string $path): string
+/** Полный адрес для canonical, og:url и hreflang; $host — другой адрес той же установки (раздел 4.5). */
+function abs_url(string $path, ?string $host = null): string
 {
     $https = ($_SERVER['HTTPS'] ?? '') === 'on' || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
-    $host = preg_replace('/[^a-z0-9.\-:]/i', '', $_SERVER['HTTP_HOST'] ?? 'localhost');
+    $host ??= preg_replace('/[^a-z0-9.\-:]/i', '', $_SERVER['HTTP_HOST'] ?? 'localhost');
     return ($https ? 'https' : 'http') . '://' . $host . $path;
 }
 

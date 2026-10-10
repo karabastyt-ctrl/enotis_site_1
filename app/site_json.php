@@ -24,7 +24,12 @@ const FIELD_MAX = [
     'service'  => ['title' => 60, 'text' => 500, 'price_note' => 40, 'button' => 30, 'recipient' => 100],
     'settings' => ['site_title' => 40, 'seo_title' => 60, 'seo_description' => 160],
     'method'   => ['label' => 40],
+    'tab'      => ['title' => 30],
+    'domain'   => ['site_title' => 40],
 ];
+
+/** Slug таба: латиница, цифры, дефис, до 40 (раздел 4.4). */
+const TAB_SLUG_RE = '/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/';
 
 /* ---------------------------------------------------------------- выгрузка */
 
@@ -76,7 +81,7 @@ function site_export(): array
     }
 
     // Элементы, тексты, фото и способы оплаты — одним проходом.
-    $rows = $pdo->query('SELECT * FROM elements WHERE section_id IS NULL ORDER BY position, id')->fetchAll();
+    $rows = $pdo->query('SELECT * FROM elements ORDER BY position, id')->fetchAll();
     $texts = [];
     foreach ($pdo->query('SELECT * FROM element_i18n')->fetchAll() as $r) {
         foreach (I18N_FIELDS as $f) {
@@ -105,12 +110,31 @@ function site_export(): array
             'req' => $m['req_json'] ? (object) (json_decode($m['req_json'], true) ?: []) : null,
         ];
     }
+    // Дети по родителю; блоки главной — 'r0', ленты таба — 'r{id таба}'.
     $kids = [];
     foreach ($rows as $r) {
-        $kids[$r['parent_id'] === null ? 0 : (int) $r['parent_id']][] = $r;
+        $kids[$r['parent_id'] === null ? 'r' . (int) $r['section_id'] : (int) $r['parent_id']][] = $r;
+    }
+    $tabTitles = [];
+    foreach ($pdo->query('SELECT * FROM section_i18n')->fetchAll() as $r) {
+        if (trim((string) $r['title']) !== '') {
+            $tabTitles[(int) $r['section_id']][$r['lang']] = $r['title'];
+        }
+    }
+    $domains = [];
+    $domTitles = [];
+    foreach ($pdo->query('SELECT * FROM domain_i18n')->fetchAll() as $r) {
+        if (trim((string) $r['site_title']) !== '') {
+            $domTitles[$r['host']][$r['lang']] = $r['site_title'];
+        }
+    }
+    foreach ($pdo->query('SELECT * FROM domains ORDER BY position, host')->fetchAll() as $d) {
+        $domains[] = ['host' => $d['host'], 'tab' => $d['section_id'] === null ? null : (int) $d['section_id'],
+                      'site_title' => (object) ($domTitles[$d['host']] ?? [])];
     }
 
-    $ctx = ['kids' => $kids, 'texts' => $texts, 'photos' => $photos, 'methods' => $methods];
+    $ctx = ['kids' => $kids, 'texts' => $texts, 'photos' => $photos, 'methods' => $methods,
+            'sections' => $pdo->query('SELECT * FROM sections ORDER BY position, id')->fetchAll(), 'tab_titles' => $tabTitles];
     return [
         'format'    => 3,
         'engine'    => ENGINE_VERSION,
@@ -131,12 +155,13 @@ function site_export(): array
                         'phone' => (string) ($set['footer_phone'] ?? '')],
         'social'    => $social,
         'operators' => $operators,
+        'domains'   => $domains,
         'docs'      => $docs,
-        'blocks'    => export_blocks(0, $ctx),
+        'blocks'    => export_blocks('r0', $ctx),
     ];
 }
 
-function export_blocks(int $parentId, array $ctx): array
+function export_blocks(int|string $parentId, array $ctx): array
 {
     $out = [];
     foreach ($ctx['kids'][$parentId] ?? [] as $r) {
@@ -171,9 +196,24 @@ function export_blocks(int $parentId, array $ctx): array
                        'recipient' => $tx('recipient')];
                 break;
             case 'tabs':
-                continue 2; // табы — этап 5
+                $b['tabs'] = export_tabs($ctx);
+                break;
         }
         $out[] = $b;
+    }
+    return $out;
+}
+
+/** Табы с настройками «страны» и своими лентами (раздел 5.4). */
+function export_tabs(array $ctx): array
+{
+    $out = [];
+    foreach ($ctx['sections'] as $s) {
+        $id = (int) $s['id'];
+        $out[] = ['id' => $id, 'slug' => $s['slug'], 'title' => (object) ($ctx['tab_titles'][$id] ?? []), 'hidden' => (bool) $s['hidden'],
+                  'currency' => $s['currency'], 'req_format' => $s['req_format'],
+                  'operator' => $s['operator_id'] !== null ? (int) $s['operator_id'] : null,
+                  'maps' => $s['maps'], 'show_prices' => (bool) $s['show_prices'], 'blocks' => export_blocks('r' . $id, $ctx)];
     }
     return $out;
 }
@@ -245,16 +285,55 @@ function site_validate(array $site): array
             $errors[] = ['id' => 'operators', 'code' => 'err.too_long', 'n' => 120];
         }
     }
-    validate_blocks($site['blocks'] ?? [], 0, $ctx);
+    validate_blocks($site['blocks'] ?? [], 0, $ctx, true);
+    $tabIds = [];
+    foreach ($site['blocks'] ?? [] as $b) {
+        foreach (($b['type'] ?? '') === 'tabs' ? ($b['tabs'] ?? []) : [] as $tab) {
+            $tabIds[] = (string) ($tab['id'] ?? '');
+        }
+    }
+    $hosts = [];
+    foreach ($site['domains'] ?? [] as $d) {
+        $host = normalize_host((string) ($d['host'] ?? ''));
+        if (!preg_match('/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}$/', $host)) {
+            $errors[] = ['id' => 'domains', 'field' => 'host', 'code' => 'err.host'];
+        } elseif (isset($hosts[$host])) {
+            $errors[] = ['id' => 'domains', 'field' => 'host', 'code' => 'err.host_twice'];
+        }
+        $hosts[$host] = true;
+        if (($d['tab'] ?? null) !== null && !in_array((string) $d['tab'], $tabIds, true)) {
+            $errors[] = ['id' => 'domains', 'field' => 'tab', 'code' => 'err.host_tab'];
+        }
+        check_lengths('domain', 'domains', $d, ['on' => []] + $ctx);
+    }
     return ['errors' => $errors, 'warnings' => $warnings];
 }
 
-function validate_blocks(array $blocks, int $level, array $ctx): void
+/** Адрес из поля «домен»: без схемы, пути, порта и «www.», в нижнем регистре. */
+function normalize_host(string $h): string
+{
+    $h = strtolower(trim($h));
+    $h = preg_replace('~^[a-z]+://~', '', $h);
+    $h = preg_replace('~[/?#:].*$~', '', $h);
+    return (string) preg_replace('/^www\./', '', $h);
+}
+
+/** $home — блоки главной: только здесь бывает блок Табы, один и последним (раздел 3.1). */
+function validate_blocks(array $blocks, int $level, array $ctx, bool $home = false): void
 {
     $once = [];
-    foreach ($blocks as $b) {
+    $last = count($blocks) - 1;
+    foreach (array_values($blocks) as $i => $b) {
         $type = $b['type'] ?? '';
         $id = $b['id'] ?? null;
+        if ($type === 'tabs') {
+            if (!$home || isset($once['tabs']) || $i !== $last) {
+                $ctx['errors'][] = ['id' => $id, 'code' => $home && !isset($once['tabs']) ? 'err.tabs_last' : 'err.tabs_home'];
+            }
+            $once['tabs'] = true;
+            validate_tabs($b['tabs'] ?? [], $ctx);
+            continue;
+        }
         if (!in_array($type, ['text', 'photo', 'tiles', 'map', 'pay', 'service'], true)) {
             $ctx['errors'][] = ['id' => $id, 'code' => 'err.bad_type'];
             continue;
@@ -333,6 +412,29 @@ function validate_blocks(array $blocks, int $level, array $ctx): void
     }
 }
 
+/** Табы: подпись на основном языке, slug, своя лента (разделы 4.4, 5.4, 10.9). */
+function validate_tabs(array $tabs, array $ctx): void
+{
+    $slugs = [];
+    foreach ($tabs as $tab) {
+        $key = 'tab:' . ($tab['id'] ?? '');
+        if (trim((string) ($tab['title'][$ctx['main']] ?? '')) === '') {
+            $ctx['errors'][] = ['id' => $key, 'lang' => $ctx['main'], 'field' => 'title', 'code' => 'err.tab_title'];
+        }
+        check_lengths('tab', $key, $tab, $ctx);
+        $slug = (string) ($tab['slug'] ?? '');
+        if ($slug !== '') {
+            if (!preg_match(TAB_SLUG_RE, $slug) || in_array($slug, RESERVED_SLUGS, true)) {
+                $ctx['errors'][] = ['id' => $key, 'field' => 'slug', 'code' => 'err.tab_slug'];
+            } elseif (isset($slugs[$slug])) {
+                $ctx['errors'][] = ['id' => $key, 'field' => 'slug', 'code' => 'err.tab_slug_twice'];
+            }
+            $slugs[$slug] = true;
+        }
+        validate_blocks($tab['blocks'] ?? [], 0, $ctx);
+    }
+}
+
 /** Длина текстов по языкам и отсутствие перевода на включённые языки (предупреждение). */
 function check_lengths(string $kind, $id, array $data, array $ctx): void
 {
@@ -354,7 +456,7 @@ function check_lengths(string $kind, $id, array $data, array $ctx): void
             }
         }
     }
-    if ($hasText && count($ctx['on']) > 1 && !in_array($kind, ['settings', 'method'], true)) {
+    if ($hasText && count($ctx['on']) > 1 && !in_array($kind, ['settings', 'method', 'domain'], true)) {
         $missing = array_values(array_diff($ctx['on'], array_keys($langsWithText)));
         if ($missing) {
             $ctx['warnings'][] = ['id' => $id, 'code' => 'warn.no_translation', 'langs' => $missing];
@@ -425,7 +527,9 @@ function site_write(array $site, array $opts = []): array
     $max = (int) $pdo->query('SELECT COALESCE(MAX(id), 0) FROM elements')->fetchColumn();
     $max = max($max, max_tree_id($site['blocks'] ?? []));
     $mMax = (int) $pdo->query('SELECT COALESCE(MAX(id), 0) FROM pay_methods')->fetchColumn();
-    foreach (['element_i18n', 'pay_method_i18n', 'pay_methods', 'elements', 'settings_i18n', 'doc_i18n'] as $t) {
+    $sMax = (int) $pdo->query('SELECT COALESCE(MAX(id), 0) FROM sections')->fetchColumn();
+    foreach (['element_i18n', 'pay_method_i18n', 'pay_methods', 'elements', 'settings_i18n', 'doc_i18n',
+              'domain_i18n', 'domains', 'section_i18n', 'sections'] as $t) {
         $pdo->exec("DELETE FROM $t");
     }
 
@@ -500,10 +604,72 @@ function site_write(array $site, array $opts = []): array
         }
     }
 
-    $ctx = ['main' => $main, 'photos_dir' => $opts['photos_dir'] ?? null, 'next' => $max, 'next_m' => $mMax, 'ids' => &$ids];
+    $ctx = ['main' => $main, 'photos_dir' => $opts['photos_dir'] ?? null, 'next' => $max, 'next_m' => $mMax,
+            'next_s' => $sMax, 'ids' => &$ids, 'tabs' => []];
+    // Slug плиток общих блоков не совпадает со slug табов: адрес /{slug} должен быть однозначным.
     $used = [];
+    foreach ($site['blocks'] ?? [] as $b) {
+        foreach (($b['type'] ?? '') === 'tabs' ? ($b['tabs'] ?? []) : [] as $tab) {
+            if (!empty($tab['slug'])) {
+                $used[(string) $tab['slug']] = true;
+            }
+        }
+    }
     write_blocks($site['blocks'] ?? [], null, $ctx, $used);
+    write_domains($site['domains'] ?? [], $ctx);
     return $ids;
+}
+
+/** Табы и их ленты. id табов сохраняются; у новых — новый, в карте соответствий как 'tab:{временный id}'. */
+function write_tabs(array $tabs, array &$ctx): void
+{
+    $pos = 0;
+    $slugs = [];
+    foreach ($tabs as $tab) {
+        $tid = $tab['id'] ?? null;
+        if (is_int($tid) && $tid > 0) {
+            $sid = $tid;
+            $ctx['next_s'] = max($ctx['next_s'], $sid);
+        } else {
+            $sid = ++$ctx['next_s'];
+            if ($tid !== null && $tid !== '') {
+                $ctx['ids']['tab:' . $tid] = $sid;
+            }
+        }
+        $ctx['tabs'][(string) $tid] = $sid;
+        $title = (string) ($tab['title'][$ctx['main']] ?? '');
+        $slug = (string) ($tab['slug'] ?? '') ?: substr(slugify($title), 0, 40);
+        $slug = unique_slug($slug, $slugs);
+        if (!(is_int($tid) && $tid > 0)) {
+            $ctx['ids']['tabslug:' . $tid] = $slug;
+        }
+        $op = $tab['operator'] ?? null;
+        $opId = $op !== null && $op !== '' ? ($ctx['ids']['op:' . $op] ?? null) : null;
+        db()->prepare('INSERT INTO sections (id, slug, position, hidden, currency, req_format, operator_id, maps, show_prices) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            ->execute([$sid, $slug, ++$pos, !empty($tab['hidden']) ? 1 : 0,
+                       in_array($tab['currency'] ?? '', ['RUB', 'GEL', 'EUR', 'USD'], true) ? $tab['currency'] : 'RUB',
+                       in_array($tab['req_format'] ?? '', ['RU', 'GE', 'other'], true) ? $tab['req_format'] : 'RU',
+                       $opId, ($tab['maps'] ?? '') === 'yandex' ? 'yandex' : 'google', ($tab['show_prices'] ?? true) ? 1 : 0]);
+        put_i18n('section_i18n', ['section_id' => $sid], ['title' => $tab['title'] ?? []]);
+        $used = [];
+        write_blocks($tab['blocks'] ?? [], null, $ctx, $used, $sid);
+    }
+}
+
+/** Адреса сайта (раздел 4.5): таб задаётся id таба из того же дерева. */
+function write_domains(array $domains, array $ctx): void
+{
+    $pos = 0;
+    foreach ($domains as $d) {
+        $host = normalize_host((string) ($d['host'] ?? ''));
+        if ($host === '') {
+            continue;
+        }
+        $tab = $d['tab'] ?? null;
+        $sid = $tab !== null && $tab !== '' ? ($ctx['tabs'][(string) $tab] ?? null) : null;
+        db()->prepare('INSERT OR IGNORE INTO domains (host, section_id, position) VALUES (?, ?, ?)')->execute([$host, $sid, ++$pos]);
+        put_i18n('domain_i18n', ['host' => $host], ['site_title' => $d['site_title'] ?? []]);
+    }
 }
 
 /** Пустая строка — NULL. */
@@ -523,6 +689,9 @@ function max_tree_id(array $blocks): int
         $max = max($max, is_int($b['id'] ?? null) ? $b['id'] : 0);
         foreach ($b['tiles'] ?? [] as $t) {
             $max = max($max, is_int($t['id'] ?? null) ? $t['id'] : 0, max_tree_id($t['blocks'] ?? []));
+        }
+        foreach ($b['tabs'] ?? [] as $tab) {
+            $max = max($max, max_tree_id($tab['blocks'] ?? []));
         }
     }
     return $max;
@@ -561,16 +730,21 @@ function put_i18n(string $table, array $keys, array $fields): void
 }
 
 /** $used — занятые slug плиток этой страницы: slug уникален в пределах страницы (раздел 4.4). */
-function write_blocks(array $blocks, ?int $parentId, array &$ctx, array &$used): void
+function write_blocks(array $blocks, ?int $parentId, array &$ctx, array &$used, ?int $section = null): void
 {
     $pos = 0;
     foreach ($blocks as $b) {
         $type = $b['type'];
-        if ($type === 'tabs') {
-            continue; // табы — этап 5
-        }
-        $row = ['id' => element_id($b['id'] ?? null, $ctx), 'type' => $type, 'parent_id' => $parentId,
+        $row = ['id' => element_id($b['id'] ?? null, $ctx), 'section_id' => $section, 'type' => $type, 'parent_id' => $parentId,
                 'position' => ++$pos, 'hidden' => !empty($b['hidden']) ? 1 : 0];
+        if ($type === 'tabs') {
+            // Блок Табы — только на главной; его табы и ленты — в sections.
+            if ($parentId === null && $section === null) {
+                insert_element($row, []);
+                write_tabs($b['tabs'] ?? [], $ctx);
+            }
+            continue;
+        }
         $i18n = ['title' => $b['title'] ?? []];
         $wine = false;
         switch ($type) {
@@ -602,7 +776,7 @@ function write_blocks(array $blocks, ?int $parentId, array &$ctx, array &$used):
         }
         $id = insert_element($row, $i18n);
         if ($type === 'tiles') {
-            write_tiles($b['tiles'] ?? [], $id, $row['frame'], $wine, $ctx, $used);
+            write_tiles($b['tiles'] ?? [], $id, $row['frame'], $wine, $ctx, $used, $section);
         }
         if ($type === 'pay') {
             write_methods($b['methods'] ?? [], $id, $ctx);
@@ -610,7 +784,7 @@ function write_blocks(array $blocks, ?int $parentId, array &$ctx, array &$used):
     }
 }
 
-function write_tiles(array $tiles, int $blockId, string $frame, bool $wine, array &$ctx, array &$used): void
+function write_tiles(array $tiles, int $blockId, string $frame, bool $wine, array &$ctx, array &$used, ?int $section): void
 {
     $pos = 0;
     foreach ($tiles as $t) {
@@ -619,7 +793,7 @@ function write_tiles(array $tiles, int $blockId, string $frame, bool $wine, arra
         // Slug создаётся из названия при первом сохранении и дальше не меняется сам (раздел 4.4).
         $slug = (!$isNew && !empty($t['slug'])) ? (string) $t['slug'] : ((string) ($t['slug'] ?? '') ?: slugify($title));
         $slug = unique_slug($slug, $used);
-        $row = ['id' => element_id($t['id'] ?? null, $ctx), 'type' => 'tile', 'parent_id' => $blockId, 'position' => ++$pos,
+        $row = ['id' => element_id($t['id'] ?? null, $ctx), 'section_id' => $section, 'type' => 'tile', 'parent_id' => $blockId, 'position' => ++$pos,
                 'hidden' => !empty($t['hidden']) ? 1 : 0, 'slug' => $slug,
                 'photo_id' => write_photo($t['photo'] ?? null, $frame, $ctx)];
         $i18n = ['title' => $t['title'] ?? [], 'subtitle' => $t['subtitle'] ?? [], 'body' => $t['text'] ?? []];
@@ -637,7 +811,7 @@ function write_tiles(array $tiles, int $blockId, string $frame, bool $wine, arra
             $ctx['ids']['slug:' . $t['id']] = $slug;
         }
         $inner = [];
-        write_blocks($wine ? [] : ($t['blocks'] ?? []), $id, $ctx, $inner);
+        write_blocks($wine ? [] : ($t['blocks'] ?? []), $id, $ctx, $inner, $section);
     }
 }
 
@@ -677,8 +851,8 @@ function write_methods(array $methods, int $elementId, array &$ctx): void
         }
         $req = $m['req'] ?? null;
         $image = nn($m['image'] ?? null);
-        if ($image !== null && !preg_match('~^qr/[A-Za-z0-9._-]+$~', $image) && empty($ctx['photos_dir'])) {
-            $image = null; // QR — только файлы, загруженные через админку
+        if ($image !== null && !preg_match('~^qr/[A-Za-z0-9._-]+$~', $image)) {
+            $image = null; // QR — только файлы из админки или из ZIP (папка qr/)
         }
         db()->prepare('INSERT INTO pay_methods (id, element_id, position, kind, provider, enabled, url, qr_path, req_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
             ->execute([$mid, $elementId, ++$pos, $kind, $provider, ($m['on'] ?? true) ? 1 : 0,

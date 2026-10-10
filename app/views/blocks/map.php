@@ -7,7 +7,7 @@ foreach (map_points($b) as $t) {
         'lng'   => (float) $t['lng'],
         'title' => $t['title'],
         'url'   => $opens ? tile_url($t) : null,
-        'popup' => $opens === 'popup' ? $t['slug'] : null,
+        'popup' => $opens === 'popup' ? (int) $t['id'] : null,
     ];
 }
 ?>
