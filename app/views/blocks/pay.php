@@ -1,7 +1,7 @@
 <?php
 $id = 'pay-' . $b['id'];
 ?>
-<section class="wrap blk">
+<section class="wrap blk"<?= eid($b['id']) ?>>
   <div class="paybar">
     <div class="paybar__text">
       <h2><?= e($b['title']) ?></h2>

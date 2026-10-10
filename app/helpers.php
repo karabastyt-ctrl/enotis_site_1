@@ -75,6 +75,22 @@ function abs_url(string $path): string
     return ($https ? 'https' : 'http') . '://' . $host . $path;
 }
 
+/** Превью админки: страница рисуется с пометками data-eid, чтобы нажатие открывало элемент в форме (раздел 10.8). */
+function preview_mode(?bool $set = null): bool
+{
+    static $on = false;
+    if ($set !== null) {
+        $on = $set;
+    }
+    return $on;
+}
+
+/** Атрибут data-eid для превью; на обычном сайте — пусто. */
+function eid(int|string $id): string
+{
+    return preview_mode() ? ' data-eid="' . e((string) $id) . '"' : '';
+}
+
 /** Шаблон из app/views/ с переменными; возвращает HTML. */
 function view(string $name, array $vars = []): string
 {

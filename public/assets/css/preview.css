@@ -1,0 +1,5 @@
+/* Превью в админке: подсказка, что элемент можно нажать, и рамка выбранного (раздел 10.8). Цвет — действие админки. */
+[data-eid] { cursor: pointer; }
+[data-eid]:hover { outline: 1px dashed rgba(91, 58, 99, .55); outline-offset: 4px; }
+.pv-hl, .pv-hl:hover { outline: 2px solid #5B3A63; outline-offset: 4px; border-radius: 4px; }
+.cookie { display: none !important; }

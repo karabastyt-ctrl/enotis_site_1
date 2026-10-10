@@ -9,7 +9,7 @@ $fmt = $op ? $op['country'] : 'RU';
 $docs = visible_docs();
 $social = social_links();
 ?>
-<footer class="ftr">
+<footer class="ftr"<?= eid('footer') ?>>
   <div class="ftr__in">
     <div class="ftr__main">
       <p class="ftr__title"><?= e(site_title()) ?></p>

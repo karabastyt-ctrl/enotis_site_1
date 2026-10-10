@@ -8,7 +8,7 @@ $size = $b['title_size'] ?: 'm';
 $body = $b['body_size'] ?: 'normal';
 $intro = $b['eyebrow'] && $size === 'l';
 ?>
-<section class="wrap blk text text--<?= e($body) ?><?= $intro ? ' text--intro' : '' ?>">
+<section class="wrap blk text text--<?= e($body) ?><?= $intro ? ' text--intro' : '' ?>"<?= eid($b['id']) ?>>
 <?php if ($b['eyebrow']): ?>
   <p class="eyebrow"><?= e($b['eyebrow']) ?></p>
 <?php endif ?>

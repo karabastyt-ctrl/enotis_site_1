@@ -67,21 +67,25 @@ function serve_missing_photo(string $path): bool
         return false;
     }
     $file = PUBLIC_UPLOADS . substr($path, strlen('/uploads'));
-    if (!is_file($file)) {
-        $aspect = $head ? '3:2' : $p['aspect'];
-        [$w, $h] = PHOTO_SIZES[$aspect][$m[4]];
-        $crop = $head
-            ? [$p['head_crop_x'], $p['head_crop_y'], $p['head_crop_w'], $p['head_crop_h']]
-            : [$p['crop_x'], $p['crop_y'], $p['crop_w'], $p['crop_h']];
-        $src = (int) $p['use_processed'] === 1 && $p['processed_path'] ? $p['processed_path'] : $p['original_path'];
-        if (!render_photo(ORIGINALS_DIR . '/' . $src, $file, $w, $h, (float) $p['rotate'], $crop)) {
-            return false;
-        }
+    if (!is_file($file) && !photo_cut($p, $head, $m[4], $file)) {
+        return false;
     }
     header('Content-Type: image/jpeg');
     header('Cache-Control: public, max-age=31536000, immutable');
     readfile($file);
     return true;
+}
+
+/** Отрезать один размер фото ($size: l, m, s) в файл $file. */
+function photo_cut(array $p, bool $head, string $size, string $file): bool
+{
+    $aspect = $head ? '3:2' : $p['aspect'];
+    [$w, $h] = PHOTO_SIZES[$aspect][$size];
+    $crop = $head
+        ? [$p['head_crop_x'], $p['head_crop_y'], $p['head_crop_w'], $p['head_crop_h']]
+        : [$p['crop_x'], $p['crop_y'], $p['crop_w'], $p['crop_h']];
+    $src = (int) $p['use_processed'] === 1 && $p['processed_path'] ? $p['processed_path'] : $p['original_path'];
+    return render_photo(ORIGINALS_DIR . '/' . $src, $file, $w, $h, (float) $p['rotate'], $crop);
 }
 
 /** Загрузить картинку с учётом EXIF-ориентации телефона. */
