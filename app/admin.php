@@ -22,12 +22,13 @@ function admin_route(string $path): void
     // Аварийный сброс без почты: data/reset-password.txt (раздел 10.10).
     $notice = admin_reset_from_file();
 
+    // Чистая установка: вход создаёт мастер /install (раздел 14.1).
+    if ($path === '/admin/install') {
+        install_route();
+        return;
+    }
     if (!admin_exists()) {
-        if ($method === 'POST' && $path === '/admin/setup') {
-            admin_setup();
-            return;
-        }
-        echo admin_page('admin/setup', ['error' => null]);
+        str_starts_with($path, '/admin/api/') ? admin_json(['error' => 'auth'], 401) : admin_redirect('/admin/install');
         return;
     }
 
@@ -181,33 +182,6 @@ function admin_sign_in(array $a): void
     $_SESSION['csrf'] = bin2hex(random_bytes(16));
 }
 
-/** Первый вход на чистой установке: создать логин и пароль. Позже это сделает мастер установки (этап 8). */
-function admin_setup(): void
-{
-    admin_check_csrf($_POST['csrf'] ?? '');
-    $lang = admin_lang();
-    $login = trim((string) ($_POST['login'] ?? ''));
-    $email = trim((string) ($_POST['email'] ?? ''));
-    $p1 = (string) ($_POST['password'] ?? '');
-    $p2 = (string) ($_POST['password2'] ?? '');
-    $error = admin_password_error($p1, $p2, $lang);
-    if ($login === '' || mb_strlen($login) > 60) {
-        $error = ta('setup.login_required', $lang);
-    } elseif ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = ta('profile.email_bad', $lang);
-    }
-    if ($error) {
-        echo admin_page('admin/setup', ['error' => $error]);
-        return;
-    }
-    db()->prepare('INSERT INTO admins (login, password_hash, email, ui_lang) VALUES (?, ?, ?, ?)')
-        ->execute([$login, password_hash($p1, PASSWORD_DEFAULT), $email ?: null, $lang]);
-    $st = db()->prepare('SELECT * FROM admins WHERE login = ?');
-    $st->execute([$login]);
-    admin_sign_in($st->fetch());
-    admin_redirect('/admin');
-}
-
 function admin_password_error(string $p1, string $p2, string $lang): ?string
 {
     if (mb_strlen($p1) < 8) {
@@ -299,7 +273,23 @@ function admin_api(string $name, string $method, array $admin): void
             admin_photo_upload();
             return;
         case 'GET original':
-            admin_original((int) ($_GET['id'] ?? 0));
+            admin_original((int) ($_GET['id'] ?? 0), (string) ($_GET['src'] ?? ''));
+            return;
+        case 'GET update':
+            admin_json(update_status(false));
+            return;
+        case 'POST update_check':
+            admin_json(update_status(true));
+            return;
+        case 'POST update_step':
+            admin_json(update_step((string) (admin_input()['step'] ?? '')));
+            return;
+        case 'POST update_rollback':
+            admin_json(update_rollback());
+            return;
+        case 'POST photo_process':
+            $in = admin_input();
+            admin_json(photo_process((int) ($in['id'] ?? 0), (string) ($in['mode'] ?? ''), (string) ($in['aspect'] ?? ''), !empty($in['again'])));
             return;
         case 'POST qr':
             admin_qr_upload();
@@ -559,13 +549,14 @@ function admin_photo_json(int $id): ?array
     return $p ? export_photo($id, ['photos' => [$id => $p]]) : null;
 }
 
-/** Исходник для редактора фото. */
-function admin_original(int $id): void
+/** Исходник для редактора фото; $src: orig — оригинал, proc — обработанный, пусто — тот, что на сайте. */
+function admin_original(int $id, string $src = ''): void
 {
     $st = db()->prepare('SELECT original_path, processed_path, use_processed FROM photos WHERE id = ?');
     $st->execute([$id]);
     $p = $st->fetch();
-    $file = $p ? ORIGINALS_DIR . '/' . ((int) $p['use_processed'] === 1 && $p['processed_path'] ? $p['processed_path'] : $p['original_path']) : null;
+    $proc = $src === 'proc' || ($src === '' && $p && (int) $p['use_processed'] === 1);
+    $file = $p ? ORIGINALS_DIR . '/' . ($proc && $p['processed_path'] ? $p['processed_path'] : $p['original_path']) : null;
     if (!$file || !is_file($file)) {
         http_response_code(404);
         return;
@@ -658,6 +649,10 @@ function admin_private(): array
         'mail_test_ok'     => (string) setting('mail_test_ok', ''),
         'counter_code'     => (string) setting('counter_code', ''),
         'payment_checked'  => setting('launch_payment_checked') === '1',
+        'photo_service'    => photo_service_name(),
+        'photo_api_key'    => null,
+        'photo_key_masked' => photo_key_masked(),
+        'photo_ready'      => photo_service_ready(),
     ];
 }
 
@@ -675,6 +670,9 @@ function private_errors(array $p): array
     if (trim((string) ($p['smtp_host'] ?? '')) !== '' && !preg_match('~^[A-Za-z0-9.-]+$~', trim((string) $p['smtp_host']))) {
         $err[] = ['id' => 'mail', 'field' => 'smtp_host', 'code' => 'err.host'];
     }
+    if (strlen(trim((string) ($p['photo_api_key'] ?? ''))) > 300) {
+        $err[] = ['id' => 'advanced', 'field' => 'photo_api_key', 'code' => 'err.too_long', 'n' => 300];
+    }
     if (mb_strlen((string) ($p['counter_code'] ?? '')) > COUNTER_MAX) {
         $err[] = ['id' => 'advanced', 'field' => 'counter_code', 'code' => 'err.too_long', 'n' => COUNTER_MAX];
     }
@@ -691,7 +689,12 @@ function private_write(array $p): void
         'smtp_user'   => trim((string) ($p['smtp_user'] ?? '')),
         'counter_code' => (string) ($p['counter_code'] ?? ''),
         'launch_payment_checked' => !empty($p['payment_checked']) ? '1' : '0',
+        'photo_service' => ($p['photo_service'] ?? '') === 'photoroom' ? 'photoroom' : 'claid',
     ];
+    // Ключ фотосервиса: как пароль ящика — null не меняли, пустая строка стереть.
+    if (array_key_exists('photo_api_key', $p) && $p['photo_api_key'] !== null) {
+        $vals['photo_api_key'] = trim((string) $p['photo_api_key']);
+    }
     // Пароль ящика: null — не меняли; пустая строка — стереть.
     if (array_key_exists('smtp_pass', $p) && $p['smtp_pass'] !== null) {
         $vals['smtp_pass'] = (string) $p['smtp_pass'];

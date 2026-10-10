@@ -10,8 +10,8 @@ csrf_form() { curl -fsS -b "$1" -c "$1" "$B$2" | grep -o 'name="csrf" value="[^"
 
 # Вход и токен API.
 J=$(mktemp)
-T=$(csrf_form "$J" /admin)
-curl -fsS -b "$J" -c "$J" -o /dev/null -d "csrf=$T&login=admin&email=admin@example.com&password=correct-horse&password2=correct-horse" "$B/admin/setup"
+T=$(curl -fsS -b "$J" -c "$J" "$B/admin/install" | grep -o 'name="csrf" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
+curl -fsS -b "$J" -c "$J" -o /dev/null -d "csrf=$T&site_title=Test&site_lang=ru&ui_lang=ru&login=admin&email=admin@example.com&password=correct-horse&password2=correct-horse" "$B/admin/install"
 CS=$(curl -fsS -b "$J" "$B/admin" | grep -o '"csrf":"[^"]*"' | head -1 | sed 's/"csrf":"//;s/"//')
 
 # Значок без своего: буква на цвете действия.
@@ -69,7 +69,7 @@ has 'To: admin@example.com' "$MAIL"
 K=$(mktemp)
 T=$(csrf_form "$K" /admin/forgot)
 curl -fsS -b "$K" -c "$K" -d "csrf=$T&login=nobody" -o /tmp/st-f1.html "$B/admin/forgot"
-curl -fsS -b "$K" -c "$K" -d "csrf=$T&login=admin" -o /tmp/st-f2.html "$B/admin/forgot"
+curl -fsS -b "$K" -c "$K" -d "csrf=$T&site_title=Test&site_lang=ru&ui_lang=ru&login=admin" -o /tmp/st-f2.html "$B/admin/forgot"
 test "$(grep -o 'note--ok[^<]*' /tmp/st-f1.html)" = "$(grep -o 'note--ok[^<]*' /tmp/st-f2.html)"
 LINK=$(grep -o 'http[^ ]*/admin/reset?token=[0-9a-f]*' "$MAIL" | tail -1)
 TOK=${LINK##*=}
@@ -81,7 +81,7 @@ has 'role="alert"' /tmp/st-f3.html
 # Не больше 3 писем в час.
 rm -f "$MAIL"
 T=$(csrf_form "$K" /admin/forgot)
-for i in 1 2 3 4; do curl -fsS -b "$K" -c "$K" -d "csrf=$T&login=admin" -o /dev/null "$B/admin/forgot"; done
+for i in 1 2 3 4; do curl -fsS -b "$K" -c "$K" -d "csrf=$T&site_title=Test&site_lang=ru&ui_lang=ru&login=admin" -o /dev/null "$B/admin/forgot"; done
 test "$(grep -c '^To: ' "$MAIL")" = 2   # одно уже ушло в этот час
 
 # Резервные копии: сегодняшняя есть, «Вернуть» возвращает прежнее состояние.

@@ -255,7 +255,9 @@ function export_photo($photoId, array $ctx): ?array
     $head = $p['head_crop_w'] !== null ? ['x' => (float) $p['head_crop_x'], 'y' => (float) $p['head_crop_y'], 'w' => (float) $p['head_crop_w'], 'h' => (float) $p['head_crop_h']] : null;
     $paths = photo_paths($p);
     return ['id' => (int) $p['id'], 'aspect' => $p['aspect'], 'rotate' => (float) $p['rotate'],
-            'crop' => $crop, 'head_crop' => $head, 'thumb' => '/uploads/' . $paths['s'], 'head_thumb' => '/uploads/' . $paths['hs']];
+            'crop' => $crop, 'head_crop' => $head, 'thumb' => '/uploads/' . $paths['s'], 'head_thumb' => '/uploads/' . $paths['hs'],
+            'mode' => $p['processed_path'] ? $p['process_mode'] : null, 'use_processed' => $p['processed_path'] && (int) $p['use_processed'] === 1,
+            'pv' => $p['processed_path'] ?: null];
 }
 
 /* ---------------------------------------------------------------- проверки */
@@ -900,7 +902,7 @@ function write_photo(?array $photo, string $aspect, array $ctx): ?int
         $id = (int) db()->lastInsertId();
     } elseif (is_int($photo['id'] ?? null)) {
         $id = $photo['id'];
-        $st = db()->prepare('SELECT aspect, crop_w FROM photos WHERE id = ?');
+        $st = db()->prepare('SELECT aspect, crop_w, processed_path, use_processed FROM photos WHERE id = ?');
         $st->execute([$id]);
         $old = $st->fetch();
         if (!$old) {
@@ -910,9 +912,11 @@ function write_photo(?array $photo, string $aspect, array $ctx): ?int
         if ($old['aspect'] !== $aspect && ($photo['aspect'] ?? $old['aspect']) !== $aspect) {
             $crop = [null, null, null, null];
         }
+        // Обработанный или оригинал (раздел 10.6.1): выбор едет с сохранением, как кадр.
+        $use = array_key_exists('use_processed', $photo) ? (int) ($photo['use_processed'] && $old['processed_path']) : (int) $old['use_processed'];
         db()->prepare('UPDATE photos SET aspect = ?, crop_x = ?, crop_y = ?, crop_w = ?, crop_h = ?, rotate = ?,
-                       head_crop_x = ?, head_crop_y = ?, head_crop_w = ?, head_crop_h = ? WHERE id = ?')
-            ->execute([$aspect, ...$crop, $rotate, ...$head, $id]);
+                       head_crop_x = ?, head_crop_y = ?, head_crop_w = ?, head_crop_h = ?, use_processed = ? WHERE id = ?')
+            ->execute([$aspect, ...$crop, $rotate, ...$head, $use, $id]);
     } else {
         return null;
     }

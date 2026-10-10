@@ -31,6 +31,7 @@ $boot = [
     </details>
   </div>
 </header>
+<div class="upbar" data-upbar></div>
 <main class="cols">
   <nav class="tree" data-tree aria-label="<?= e(ta('tree.label', $ui)) ?>"><p class="muted pad"><?= e(ta('app.loading', $ui)) ?></p></nav>
   <section class="form" data-form></section>

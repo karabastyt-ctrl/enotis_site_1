@@ -24,9 +24,17 @@ function route(string $uri): void
         }
     } catch (Throwable $ex) {
         error_log('[db] ' . $ex->getMessage());
+        // Новый код не поднял базу сразу после замены файлов — вернуть прежнюю версию (раздел 14.2).
+        update_recover_after_failure();
         http_response_code(503);
         header('Retry-After: 60');
         echo view('updating');
+        return;
+    }
+    // Мастер установки (раздел 14.1): /install → /admin/install (там живёт сессия админки).
+    // Чистая установка без наполнения: главная тоже ведёт в мастер.
+    if ($path === '/install' || ($path === '/' && install_open() && site_is_empty())) {
+        admin_redirect('/admin/install');
         return;
     }
     if ($admin) {
