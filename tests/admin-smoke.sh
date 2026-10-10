@@ -9,7 +9,8 @@ csrf() { curl -fsS -b "$J" -c "$J" "$B/admin" | grep -o 'name="csrf" value="[^"]
 # Новая установка: создаём вход.
 T=$(csrf)
 curl -fsS -b "$J" -c "$J" -o /dev/null -d "csrf=$T&login=admin&email=a@example.com&password=correct-horse&password2=correct-horse" "$B/admin/setup"
-curl -fsS -b "$J" -c "$J" "$B/admin" | grep -q 'id="boot"'
+curl -fsS -b "$J" -c "$J" -o /tmp/admin-boot.html "$B/admin"
+grep -q 'id="boot"' /tmp/admin-boot.html
 
 # Дерево и сохранение без изменений: сайт на выходе тот же.
 BEFORE=$(curl -fsS "$B/" | sed 's#/uploads/photos/[0-9]*-##g' | md5sum)
@@ -32,12 +33,15 @@ test "$(curl -s -o /dev/null -w '%{http_code}' -b "$J" -H 'Content-Type: applica
 test "$(curl -s -o /dev/null -w '%{http_code}' "$B/admin/api/site")" = 401
 
 # Превью несохранённого.
-curl -fsS -b "$J" -H "X-CSRF: $CS" -H 'Content-Type: application/json' --data @/tmp/admin-save.json "$B/admin/api/preview" | grep -q '"ok":true'
-curl -fsS -b "$J" "$B/admin/preview?path=/" | grep -q 'data-eid='
+curl -fsS -b "$J" -H "X-CSRF: $CS" -H 'Content-Type: application/json' --data @/tmp/admin-save.json "$B/admin/api/preview" > /tmp/admin-prev.json
+grep -q '"ok":true' /tmp/admin-prev.json
+curl -fsS -b "$J" -o /tmp/admin-prev.html "$B/admin/preview?path=/"
+grep -q 'data-eid=' /tmp/admin-prev.html
 
 # Неверный пароль не пускает; выход закрывает сессию.
 K=$(mktemp); T=$(curl -fsS -c "$K" "$B/admin" | grep -o 'name="csrf" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
-curl -fsS -b "$K" -c "$K" -d "csrf=$T&login=admin&password=wrong" "$B/admin/login" | grep -q 'role="alert"'
+curl -fsS -b "$K" -c "$K" -d "csrf=$T&login=admin&password=wrong" -o /tmp/admin-login.html "$B/admin/login"
+grep -q 'role="alert"' /tmp/admin-login.html
 curl -fsS -b "$J" -c "$J" -o /dev/null -d "csrf=$CS" "$B/admin/logout" || true
 test "$(curl -s -o /dev/null -w '%{http_code}' -b "$J" "$B/admin/api/site")" = 401
 echo "admin smoke ok"
