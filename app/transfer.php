@@ -91,7 +91,8 @@ function export_photo_file(?array $photo, array &$files): ?array
     if (!$photo || !is_int($photo['id'] ?? null)) {
         return null;
     }
-    $st = db()->prepare('SELECT original_path FROM photos WHERE id = ?');
+    // В ZIP — тот файл, что на сайте: обработанный, если выбран он (кадр рассчитан на него).
+    $st = db()->prepare('SELECT CASE WHEN use_processed = 1 AND processed_path IS NOT NULL THEN processed_path ELSE original_path END FROM photos WHERE id = ?');
     $st->execute([$photo['id']]);
     $orig = $st->fetchColumn();
     if (!$orig || !is_file(ORIGINALS_DIR . '/' . $orig)) {

@@ -767,7 +767,7 @@
       f.appendChild(seoBox(tl, M));
     },
     wine: function (f, tl, M) {
-      f.appendChild(photoField(tl, 'photo', '4:5'));
+      f.appendChild(photoField(tl, 'photo', '4:5', true));
       f.appendChild(textField(tl, 'title', t('field.name'), M.title));
       f.appendChild(textField(tl, 'subtitle', t('field.wine_subtitle'), M.subtitle, { hint: t('hint.wine_subtitle') }));
       f.appendChild(h('div', { class: 'two' }, [
@@ -1367,7 +1367,18 @@
     upd();
     f.appendChild(field(t('field.counter_code'), area, t('hint.counter'), cnt, privErr('counter_code')));
     f.appendChild(h('p', { class: 'hint hint--warn', text: t('hint.counter_law') }));
+
+    // Фотосервис (раздел 10.6.1): ключ хранится только в этой установке, показывается замаскированным.
+    f.appendChild(section(t('sec.photo_service')));
+    f.appendChild(seg(t('field.photo_service'), [['claid', 'Claid.ai'], ['photoroom', 'Photoroom']], P.photo_service, function (v) { P.photo_service = v; changed(); formAdvancedRedraw(); }));
+    var key = h('input', { type: 'password', autocomplete: 'off', spellcheck: 'false', placeholder: P.photo_key_masked || '', 'data-field': 'photo_api_key' });
+    if (P.photo_api_key) key.value = P.photo_api_key;
+    key.addEventListener('input', function () { P.photo_api_key = key.value; changed(); });
+    var clear = P.photo_key_masked ? h('button', { type: 'button', class: 'linkbtn linkbtn--danger', text: t('photo.key_clear'), onclick: function () { P.photo_api_key = ''; P.photo_key_masked = ''; changed(); formAdvancedRedraw(); } }) : null;
+    f.appendChild(field(t('field.photo_api_key'), key, P.photo_key_masked ? t('hint.photo_key_set') : t('hint.photo_key'), clear, privErr('photo_api_key')));
+    f.appendChild(h('p', { class: 'hint' }, [t('hint.photo_service') + ' ', h('a', { href: P.photo_service === 'photoroom' ? 'https://app.photoroom.com/api-dashboard' : 'https://claid.ai/', target: '_blank', rel: 'noopener', text: P.photo_service === 'photoroom' ? 'photoroom.com' : 'claid.ai' })]));
     root.appendChild(f);
+    function formAdvancedRedraw() { root.innerHTML = ''; formAdvanced(root); }
   }
 
   /* ---------------------------------------------------------------- Перед запуском (раздел 10.13) */
@@ -1515,13 +1526,41 @@
 
   /* ---------------------------------------------------------------- фото (раздел 10.6) */
 
-  function photoField(node, key, aspect) {
+  // Фотосервис (раздел 10.6.1): режим по месту фото — вина «Студийное фото», остальное «Улучшить».
+  // Выбор «обработанное или оригинал» хранится у фото и уходит на сервер с сохранением.
+  function svcOn() { return !!(S.priv && S.priv.photo_ready); }
+
+  function photoField(node, key, aspect, wine) {
     var p = node[key];
+    var mode = svcOn() ? (node._svc || (wine ? 'studio' : 'enhance')) : 'none';
     var thumb;
     if (p) {
-      thumb = h('img', { class: 'ph__img ph__img--' + aspect.replace(':', 'x'), alt: '', src: p._thumb || (p.crop || p.aspect === aspect ? p.thumb : '/admin/api/original?id=' + p.id) });
+      thumb = h('img', { class: 'ph__img ph__img--' + aspect.replace(':', 'x'), alt: '', src: p._thumb || (p.crop || p.aspect === aspect ? p.thumb : srcOf(p)) });
     } else {
       thumb = h('span', { class: 'ph__none ph__img--' + aspect.replace(':', 'x'), text: t('photo.none') });
+    }
+    function edit(ph, hint) {
+      openEditor(ph, aspect, false, function (res) { node[key] = Object.assign(ph, res); changed(); renderForm(); }, hint);
+    }
+    // Переключить источник: кадр и верх страницы считаются заново (у файлов разные размеры).
+    function useSource(ph, processed, crop) {
+      ph.use_processed = processed; ph.crop = crop || null; ph.head_crop = null; ph.rotate = 0;
+      ph._thumb = null; ph._head_thumb = null;
+      if (ph === node[key]) { changed(); renderForm(); }
+    }
+    function process(ph, again) {
+      var cancelled = false;
+      busyBox(t('photo.processing'), function () { cancelled = true; edit(ph); });
+      api('POST', 'photo_process', { id: ph.id, mode: mode, aspect: aspect, again: again }).then(function (j) {
+        if (cancelled) return;
+        busyBox(null);
+        if (!j.ok) { alertBox(t(j.error || 'photo.svc_failed')); edit(ph); return; }
+        ph.mode = j.mode; ph.pv = j.processed;
+        compareBox(ph).then(function (useIt) {
+          if (useIt) { useSource(ph, true, j.crop); edit(ph, j.fits ? null : t('photo.not_fit')); }
+          else { if (ph.use_processed) useSource(ph, false); edit(ph); }
+        });
+      }).catch(function () { if (cancelled) return; busyBox(null); alertBox(t('photo.svc_failed')); edit(ph); });
     }
     var input = h('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp', hidden: true });
     input.addEventListener('change', function () {
@@ -1535,21 +1574,61 @@
       api('POST', 'photo', fd, true).then(function (j) {
         setBusy(null);
         if (!j.photo) { alertBox(t(j.error || 'photo.upload_failed')); return; }
-        openEditor(j.photo, aspect, false, function (res) {
-          node[key] = Object.assign(j.photo, res);
-          changed(); renderForm();
-        });
+        if (mode === 'none') edit(j.photo); else process(j.photo, false);
       }).catch(function () { setBusy(null); alertBox(t('photo.upload_failed')); });
     });
     var acts = h('div', { class: 'ph__acts' }, [
       h('button', { type: 'button', class: 'btn btn--ghost btn--small', text: p ? t('photo.replace') : t('photo.upload'), onclick: function () { input.click(); } }),
-      p ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', text: t('photo.crop'), onclick: function () {
-        openEditor(p, aspect, false, function (res) { Object.assign(p, res); changed(); renderForm(); });
-      } }) : null,
+      p ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', text: t('photo.crop'), onclick: function () { edit(p); } }) : null,
+      p && mode !== 'none' ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', text: t(p.mode === mode ? 'photo.process_again' : 'photo.process'), onclick: function () { process(p, p.mode === mode); } }) : null,
       p ? h('button', { type: 'button', class: 'linkbtn linkbtn--danger', text: t('photo.remove'), onclick: function () { node[key] = null; changed(); renderForm(); } }) : null,
       input
     ]);
-    return h('div', { class: 'fld ph' }, [h('span', { class: 'fld__l', text: t('field.photo') + ' · ' + t('frame.' + aspect) }), h('div', { class: 'ph__row' }, [thumb, acts])]);
+    var status = null;
+    if (p && p.mode) {
+      status = h('p', { class: 'ph__svc' }, p.use_processed
+        ? [t('photo.processed') + ': ' + t('photo.mode.' + p.mode) + ' · ', h('button', { type: 'button', class: 'linkbtn', text: t('photo.back_original'), onclick: function () { useSource(p, false); edit(p); } })]
+        : [h('button', { type: 'button', class: 'linkbtn', text: t('photo.back_processed') + ' (' + t('photo.mode.' + p.mode) + ')', onclick: function () { useSource(p, true); edit(p); } })]);
+    }
+    var modes = svcOn() ? seg(t('photo.processing_mode'), [['studio', t('photo.mode.studio')], ['enhance', t('photo.mode.enhance')], ['none', t('photo.mode.none')]], mode,
+      function (v) { node._svc = v; renderForm(); }) : null;
+    if (modes) modes.classList.add('ph__modes');
+    return h('div', { class: 'fld ph' }, [h('span', { class: 'fld__l', text: t('field.photo') + ' · ' + t('frame.' + aspect) }), modes, h('div', { class: 'ph__row' }, [thumb, acts]), status]);
+  }
+
+  // Файл фото для редактора: обработанный или оригинал — по несохранённому выбору.
+  function srcOf(p) {
+    return '/admin/api/original?id=' + p.id + '&src=' + (p.use_processed ? 'proc&v=' + encodeURIComponent(p.pv || '') : 'orig');
+  }
+
+  // «Было / Стало» (раздел 10.6.1). true — «Применить», false — «Оставить как было».
+  function compareBox(p) {
+    return new Promise(function (resolve) {
+      var ov;
+      function done(v) { ov.remove(); resolve(v); }
+      ov = h('div', { class: 'mo' }, [h('div', { class: 'mbox cmp', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('photo.compare') }, [
+        h('h3', { text: t('photo.compare') + ' · ' + t('photo.mode.' + p.mode) }),
+        h('div', { class: 'cmp__row' }, [
+          h('figure', {}, [h('img', { alt: '', src: '/admin/api/original?id=' + p.id + '&src=orig' }), h('figcaption', { text: t('photo.before') })]),
+          h('figure', {}, [h('img', { alt: '', src: '/admin/api/original?id=' + p.id + '&src=proc&v=' + encodeURIComponent(p.pv || '') }), h('figcaption', { text: t('photo.after') })])
+        ]),
+        h('div', { class: 'mbox__acts' }, [
+          h('button', { type: 'button', class: 'btn btn--ghost', text: t('photo.keep'), onclick: function () { done(false); } }),
+          h('button', { type: 'button', class: 'btn btn--action', text: t('btn.apply'), onclick: function () { done(true); } })
+        ])
+      ])]);
+      document.body.appendChild(ov);
+    });
+  }
+
+  // Окно ожидания с «Отменить»; busyBox(null) закрывает.
+  function busyBox(text, onCancel) {
+    var old = $('.busy--svc');
+    if (old) old.remove();
+    if (!text) return;
+    var b = h('div', { class: 'busy busy--svc', role: 'status' }, [text + ' ',
+      h('button', { type: 'button', class: 'linkbtn', text: t('btn.cancel'), onclick: function () { b.remove(); onCancel(); } })]);
+    document.body.appendChild(b);
   }
 
   function headPhotoField(tl) {
@@ -1566,9 +1645,9 @@
   var SIZES = { '3:2': [1600, 1067], '4:5': [1200, 1500] };
 
   // Редактор кадра на Cropper.js: рамка неподвижна, двигается и масштабируется фото.
-  function openEditor(photo, aspect, head, onApply) {
+  function openEditor(photo, aspect, head, onApply, hint) {
     var ratio = aspect === '3:2' ? 3 / 2 : 4 / 5;
-    var img = h('img', { alt: '', src: '/admin/api/original?id=' + photo.id });
+    var img = h('img', { alt: '', src: srcOf(photo) });
     var zoom = h('input', { type: 'range', min: '1', max: '4', step: '0.01', value: '1' });
     var straight = h('input', { type: 'range', min: '-10', max: '10', step: '0.1', value: '0', disabled: head });
     var warn = h('p', { class: 'hint hint--warn', hidden: true, text: t('photo.small') });
@@ -1578,7 +1657,7 @@
     var base90 = 0, baseRatio = 1, cropper = null;
     var box = h('div', { class: 'ed', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('photo.editor') }, [
       h('div', { class: 'ed__h' }, [h('h3', { text: head ? t('photo.head') : t('photo.editor') }), h('span', { class: 'ed__frame', text: t('frame.' + aspect) })]),
-      h('div', { class: 'ed__b' }, [h('div', { class: 'ed__stage' }, [img]), h('div', { class: 'ed__side' }, [h('b', { text: t('photo.how') }), previews, warn])]),
+      h('div', { class: 'ed__b' }, [h('div', { class: 'ed__stage' }, [img]), h('div', { class: 'ed__side' }, [h('b', { text: t('photo.how') }), previews, warn, hint ? h('p', { class: 'hint hint--warn', text: hint }) : null])]),
       h('div', { class: 'ed__tools' }, [
         h('label', {}, [t('photo.zoom') + ' ', zoom]),
         head ? null : h('button', { type: 'button', class: 'btn btn--ghost btn--small', text: '↻ ' + t('photo.rotate'), onclick: function () {

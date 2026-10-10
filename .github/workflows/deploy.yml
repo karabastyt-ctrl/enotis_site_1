@@ -78,6 +78,17 @@ jobs:
           sleep 1
           tests/settings-smoke.sh http://127.0.0.1:8083 "$ENOTIS_MAIL_FILE"
           if grep -E 'PHP (Warning|Notice|Deprecated|Fatal)' /tmp/php-set.log | grep -v 'JIT'; then exit 1; fi
+      - name: Фотосервис (заглушка без сети)
+        env:
+          ENOTIS_DATA: /tmp/enotis-photo
+          ENOTIS_PHOTO_FAKE: '1'
+        run: |
+          mkdir -p "$ENOTIS_DATA"
+          php bin/import.php tests/fixtures/aggregator/site.json
+          php -S 127.0.0.1:8084 -t public public/index.php >/tmp/php-photo.log 2>&1 &
+          sleep 1
+          tests/photo-smoke.sh http://127.0.0.1:8084
+          if grep -E 'PHP (Warning|Notice|Deprecated|Fatal)' /tmp/php-photo.log | grep -v 'JIT'; then exit 1; fi
 
   deploy:
     needs: check
