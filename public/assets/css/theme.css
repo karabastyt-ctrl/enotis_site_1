@@ -23,19 +23,32 @@
   /* Фокус: бутылочная рамка + мягкий ореол */
   --focus-ring:     0 0 0 2px var(--c-nav), 0 0 0 5px var(--c-nav-soft);
 
-  /* Шрифты. Файлы (свой сервер) и грузинские Noto по unicode-range подключаются на этапе 3. */
+  /* Шрифты на своём сервере (assets/fonts/fonts.css); грузинский берётся из Noto по unicode-range. */
   --font-head: "Playfair Display", "Noto Serif Georgian", Georgia, "Times New Roman", serif;
   --font-body: "Golos Text", "Noto Sans Georgian", system-ui, -apple-system, "Segoe UI", sans-serif;
 
+  /* Размеры текста: варианты блока Текст (раздел 5.2) — только эти */
+  --fs-body:    17px;
+  --fs-lead:    19px;
+  --fs-small:   15px;
+  --fs-title-l: clamp(32px, 5vw, 46px);
+  --fs-title-m: clamp(26px, 3.4vw, 32px);
+  --fs-title-s: clamp(21px, 2.6vw, 24px);
+
   /* Размеры и отступы */
-  --radius:   12px;
-  --gap:      24px;
-  --page-max: 1120px;
+  --radius:      14px;
+  --gap:         24px;
+  --gutter:      16px;
+  --blk-gap:     48px;
+  --page-max:    1180px;
+  --text-max:    760px;
+  --shadow-soft: 0 1px 2px rgba(43, 38, 36, .06), 0 4px 14px rgba(43, 38, 36, .05);
+  --shadow:      0 4px 10px rgba(43, 38, 36, .08), 0 18px 40px rgba(43, 38, 36, .12);
 }
+@media (min-width: 600px) { :root { --gutter: 28px; --blk-gap: 64px; } }
 
 body { margin: 0; background: var(--c-bg); color: var(--c-ink); font-family: var(--font-body); line-height: 1.5; }
-h1, h2, h3 { font-family: var(--font-head); font-weight: 500; line-height: 1.2; }
+h1, h2, h3 { font-family: var(--font-head); font-weight: 600; line-height: 1.2; }
 h1::first-letter, h2::first-letter { color: var(--c-action); }
-.page { max-width: var(--page-max); margin: 0 auto; padding: 48px 16px; }
 a { color: inherit; }
 :focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 4px; }

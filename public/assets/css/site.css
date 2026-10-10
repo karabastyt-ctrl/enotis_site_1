@@ -1,0 +1,218 @@
+/* Сайт-лента: раскладка и блоки (спецификация 2.1, разделы 5–9). Цвета и размеры — только переменные из theme.css. */
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 72px; }
+body { font-size: var(--fs-body); }
+img { max-width: 100%; height: auto; display: block; }
+h1, h2, h3 { margin: 0; color: var(--c-ink); }
+p { margin: 0 0 .8em; }
+button { font: inherit; }
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.skip { position: absolute; left: -9999px; top: 8px; z-index: 100; background: var(--c-paper); padding: 8px 14px; border-radius: 8px; }
+.skip:focus { left: 8px; }
+
+.wrap { max-width: var(--page-max); margin: 0 auto; padding: 0 var(--gutter); }
+.feed { padding-bottom: 24px; }
+.blk { margin-top: var(--blk-gap); }
+.eyebrow { font-size: 13px; letter-spacing: .18em; text-transform: uppercase; font-weight: 600; color: var(--c-mute); margin-bottom: 10px; }
+.smallcaps { font-variant: small-caps; letter-spacing: .04em; }
+.fine { font-size: 13px; color: var(--c-mute); margin-top: 12px; }
+.price { font-family: var(--font-head); font-weight: 600; color: var(--c-action); font-size: 1.15em; }
+
+/* Кнопки: действие — бордо; второстепенные — прозрачные с бордовой рамкой (раздел 9.1). */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 11px 24px;
+  border-radius: 999px; border: 1.5px solid var(--c-action); background: var(--c-action); color: var(--c-on-action);
+  font-weight: 600; font-size: 15px; text-decoration: none; cursor: pointer; text-align: center; transition: background .15s, border-color .15s; }
+.btn:hover { background: var(--c-action-hover); border-color: var(--c-action-hover); }
+.btn--ghost { background: transparent; color: var(--c-action); }
+.btn--ghost:hover { background: transparent; color: var(--c-action-hover); border-color: var(--c-action-hover); }
+
+/* Шапка */
+.hdr { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--c-bg) 92%, transparent);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); transition: transform .25s; }
+.hdr.is-hidden { transform: translateY(-100%); }
+.hdr__in { max-width: var(--page-max); margin: 0 auto; padding: 10px var(--gutter); min-height: 60px; display: flex; align-items: center; gap: 16px; }
+.hdr__back { text-decoration: none; color: var(--c-ink); font-size: 15px; white-space: nowrap; }
+.hdr__brand { display: flex; align-items: center; gap: 10px; text-decoration: none; flex: 1; min-width: 0; }
+.hdr__logo { height: 40px; width: auto; }
+.hdr__title { font-family: var(--font-head); font-weight: 600; font-size: 20px; color: var(--c-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.langs { display: flex; gap: 6px; align-items: center; font-size: 14px; color: var(--c-mute); }
+.langs a { text-decoration: none; color: var(--c-mute); padding: 4px 2px; }
+.langs a[aria-current] { color: var(--c-nav); font-weight: 700; }
+.menu { position: relative; }
+.menu summary { list-style: none; cursor: pointer; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; font-size: 22px; color: var(--c-ink); }
+.menu summary::-webkit-details-marker { display: none; }
+.menu__list { position: absolute; right: 0; top: 52px; min-width: 260px; max-height: 70vh; overflow: auto; background: var(--c-paper);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 8px; display: flex; flex-direction: column; }
+.menu__list a { padding: 10px 12px; border-radius: 8px; text-decoration: none; }
+.menu__list a:hover { background: var(--c-nav-soft); color: var(--c-nav); }
+
+/* Текст */
+.text > * { max-width: var(--text-max); }
+.text .title { margin-bottom: 12px; }
+.title--l { font-size: var(--fs-title-l); }
+.title--m { font-size: var(--fs-title-m); }
+.title--s { font-size: var(--fs-title-s); }
+.subtitle { font-size: 1.1em; color: var(--c-mute); }
+.text--lead { font-size: var(--fs-lead); }
+.text--small { font-size: var(--fs-small); }
+.text--intro { text-align: center; margin-top: 56px; }
+.text--intro > * { margin-left: auto; margin-right: auto; }
+.text--intro .title { margin-bottom: 16px; }
+
+/* Рамки фото */
+.frame { display: block; position: relative; overflow: hidden; background: var(--c-line); }
+.frame img { width: 100%; height: 100%; object-fit: cover; }
+.frame--3x2 { aspect-ratio: 3 / 2; }
+.frame--4x5 { aspect-ratio: 4 / 5; }
+.frame--wine { background: var(--c-wine-bg); }
+.frame--wine img { object-fit: contain; }
+.bottle { position: absolute; inset: 18% 38%; width: 24%; height: 64%; color: color-mix(in srgb, var(--c-mute) 35%, var(--c-wine-bg)); }
+
+/* Фото */
+.photo { margin-left: auto; margin-right: auto; }
+.photo .frame { border-radius: var(--radius); }
+.photo--narrow { max-width: calc(var(--page-max) / 2); }
+.photo figcaption { font-size: 14px; color: var(--c-mute); margin-top: 8px; }
+
+/* Плитки: крупные 3/2/1, компактные 4/3/2 (раздел 5.5) */
+.tiles__h { font-size: var(--fs-title-m); margin-bottom: 20px; }
+.grid { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--gap); grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); }
+.tiles--large { --cols: 1; }
+.tiles--compact { --cols: 2; }
+@media (min-width: 600px) { .tiles--large { --cols: 2; } .tiles--compact { --cols: 3; } }
+@media (min-width: 1024px) { .tiles--large { --cols: 3; } .tiles--compact { --cols: 4; } }
+.tiles--wine .grid { max-width: 900px; margin: 0 auto; }
+.grid > li { display: flex; }
+.card { display: flex; flex-direction: column; width: 100%; background: var(--c-paper); border-radius: var(--radius); overflow: hidden;
+  text-decoration: none; color: var(--c-ink); box-shadow: var(--shadow-soft); transition: transform .15s, box-shadow .15s; }
+a.card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.card__plate { flex: 1; display: flex; align-items: flex-end; gap: 12px; padding: 16px 18px 18px; }
+.card__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.card__title { font-family: var(--font-head); font-weight: 600; font-size: 20px; line-height: 1.25; color: var(--c-ink);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card__sub { font-size: 14px; color: var(--c-mute); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card__icon { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 18px;
+  color: var(--c-action); border: 1.5px solid var(--c-action); }
+.tiles--compact .card__title { font-size: 17px; }
+.card--wine .card__title { font-size: 17px; }
+.wine__line { font-size: 13px; color: var(--c-mute); }
+.card--wine .frame--wine img { filter: drop-shadow(0 10px 10px rgba(43, 38, 36, .18)); }
+
+/* Карта */
+.map__h { font-size: var(--fs-title-m); margin-bottom: 16px; }
+.map__box { border-radius: var(--radius); overflow: hidden; background: var(--c-paper); }
+.map__box.is-map { height: clamp(320px, 50vw, 560px); }
+.map__list { columns: 2 220px; margin: 0; padding: 18px 18px 18px 36px; }
+.map__list li { margin: 4px 0; }
+.map__hint { font-size: 13px; color: var(--c-mute); margin-top: 8px; }
+.marker { display: block; width: 16px; height: 16px; border-radius: 50%; background: var(--c-nav); border: 3px solid var(--c-paper); box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+.leaflet-container { font: inherit; }
+.leaflet-container a.leaflet-popup-close-button { color: var(--c-mute); }
+.leaflet-popup-content a { color: var(--c-nav); font-weight: 600; }
+
+/* Оплата: спокойная полоса, кнопка справа (на телефоне под текстом) */
+.paybar { background: var(--c-paper); border-radius: var(--radius); padding: 28px 30px; display: flex; gap: 24px; align-items: center; }
+.paybar__text { flex: 1; }
+.paybar h2 { font-size: var(--fs-title-s); margin-bottom: 6px; }
+.paybar p:last-child { margin-bottom: 0; }
+
+/* Услуги */
+.services--grid { display: grid; gap: var(--gap); grid-template-columns: 1fr; }
+@media (min-width: 600px) { .services--grid { grid-template-columns: 1fr 1fr; } }
+.svc { background: var(--c-paper); border-radius: var(--radius); padding: 26px 28px; display: flex; flex-direction: column; align-items: flex-start; }
+.svc h2 { font-size: var(--fs-title-s); margin-bottom: 8px; }
+.svc__price { margin: 6px 0 16px; }
+.svc__note { color: var(--c-mute); font-size: 14px; }
+
+/* Страница плитки (раздел 6.1) */
+.tpage__top { display: grid; gap: 24px; padding-top: 28px; max-width: 980px; }
+.tpage__photo { border-radius: var(--radius); }
+.tpage__text h1 { font-size: var(--fs-title-l); margin-bottom: 14px; }
+@media (min-width: 768px) { .tpage__top { grid-template-columns: 1fr 1fr; align-items: start; gap: 36px; padding-top: 40px; } }
+.tpage__place { max-width: 980px; margin-top: 24px; }
+
+/* «Как добраться» */
+.place { margin-top: 20px; }
+.place__h { font-family: var(--font-body); font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--c-mute); margin-bottom: 8px; }
+.minimap { aspect-ratio: 16 / 9; border-radius: var(--radius); overflow: hidden; background: var(--c-line); margin: 10px 0 14px; }
+.place__btns { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* Окна: поп-ап плитки и окно оплаты (разделы 6.2, 7) */
+body.is-locked { overflow: hidden; }
+.ov { position: fixed; inset: 0; z-index: 50; background: rgba(28, 24, 22, .55); display: none; align-items: center; justify-content: center; padding: 24px; }
+.ov.is-open, .ov:target { display: flex; }
+.pp { position: relative; width: 100%; max-width: 640px; max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); overflow: auto;
+  background: var(--c-paper); border-radius: var(--radius); box-shadow: var(--shadow); overscroll-behavior: contain; }
+.pp:focus { outline: none; }
+.pp__bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  background: color-mix(in srgb, var(--c-paper) 94%, transparent); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.pp__back { text-decoration: none; color: var(--c-ink); font-size: 15px; white-space: nowrap; padding: 6px 4px; }
+.pp__name { flex: 1; min-width: 0; text-align: right; font-family: var(--font-head); font-weight: 600; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; opacity: 0; transition: opacity .15s; }
+.pp.is-scrolled .pp__name { opacity: 1; }
+.pp__x { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; text-decoration: none; font-size: 26px; color: var(--c-ink); }
+.pp__x:hover { background: var(--c-bg); }
+.pp__body { padding: 0 26px 28px; }
+.pp__photo { margin: 0 -26px 20px; }
+.pp h2 { font-size: var(--fs-title-m); margin-bottom: 6px; }
+.pp__sub { color: var(--c-mute); }
+.paywin .pp__bar > span { flex: 1; }
+.qr { margin: 18px 0; text-align: center; }
+.qr img { margin: 0 auto; border: 1px solid var(--c-line); border-radius: 12px; padding: 10px; background: #fff; }
+.qr figcaption { font-size: 13px; color: var(--c-mute); margin-top: 8px; }
+.paywin__btns { display: flex; flex-direction: column; gap: 10px; margin: 18px 0; }
+.req { margin-top: 14px; background: var(--c-bg); border-radius: 12px; padding: 4px 16px; }
+.req summary { cursor: pointer; padding: 12px 0; font-weight: 600; }
+.req dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 4px 0 14px; font-size: 15px; }
+.req dt { color: var(--c-mute); }
+.req dd { margin: 0; overflow-wrap: anywhere; }
+.req .btn { margin-bottom: 14px; }
+
+/* Документ, 404 */
+.doc { padding-top: 40px; }
+.doc > * { max-width: var(--text-max); }
+.doc h1 { font-size: var(--fs-title-l); margin-bottom: 20px; }
+.page-msg { padding: 80px var(--gutter); text-align: center; }
+.page-msg h1 { font-size: var(--fs-title-l); margin-bottom: 20px; }
+
+/* Подвал */
+.ftr { margin-top: 64px; background: var(--c-paper); color: var(--c-mute); font-size: 14px; }
+.ftr__in { max-width: var(--page-max); margin: 0 auto; padding: 36px var(--gutter) 40px; display: grid; gap: 20px; }
+.ftr__title { font-family: var(--font-head); font-size: 18px; font-weight: 600; color: var(--c-ink); margin-bottom: 6px; }
+.ftr a { color: var(--c-ink); }
+.ftr__contacts { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.ftr__docs { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.social { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.social a { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--c-bg); color: var(--c-ink); }
+.social a:hover { background: var(--c-nav-soft); color: var(--c-nav); }
+@media (min-width: 768px) { .ftr__in { grid-template-columns: 1fr 1fr; } .ftr__legal { text-align: right; } .ftr__docs { justify-content: flex-end; } }
+
+/* Cookies */
+.cookie { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 40; max-width: 640px; margin: 0 auto; display: flex; gap: 16px; align-items: center;
+  background: var(--c-paper); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 18px; font-size: 14px; }
+.cookie p { flex: 1; margin: 0; }
+.cookie[hidden] { display: none; }
+
+/* Телефон */
+@media (max-width: 599px) {
+  .hdr__title { font-size: 17px; }
+  .langs { font-size: 12px; gap: 4px; }
+  .paybar { flex-direction: column; align-items: stretch; padding: 22px 20px; }
+  .ov { padding: 0; }
+  .pp { max-width: none; max-height: none; height: 100%; border-radius: 0; }
+  .pp__x { display: none; }
+  .pp__x--always { display: grid; }
+  .pp__body { padding: 0 18px 28px; }
+  .pp__photo { margin: 0 -18px 18px; }
+  .ov--sheet { align-items: flex-end; }
+  .ov--sheet .pp { height: auto; max-height: 92vh; max-height: 92dvh; border-radius: var(--radius) var(--radius) 0 0; }
+  .text--intro { margin-top: 36px; }
+}
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+
+/* Слои Leaflet не вылезают поверх шапки и окон. */
+.map__box, .minimap { isolation: isolate; }
+/* Вертикальное фото в поп-апе не занимает весь экран. */
+.pp__photo.frame--4x5 { aspect-ratio: auto; height: min(58vh, 560px); }

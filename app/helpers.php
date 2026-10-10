@@ -56,11 +56,37 @@ function ta(string $key, string $uiLang = 'ru'): string
     return lang_strings('admin', $uiLang)[$key] ?? lang_strings('admin', 'ru')[$key] ?? $key;
 }
 
-function render(string $page, array $vars = []): void
+/** Адрес на текущем (или указанном) языке: основной язык без префикса, остальные — /ka/… (раздел 4.6). */
+function url(string $path = '/', ?string $lang = null): string
+{
+    $lang ??= current_lang();
+    $path = '/' . ltrim($path, '/');
+    if ($lang === default_lang()) {
+        return $path;
+    }
+    return '/' . $lang . ($path === '/' ? '/' : $path);
+}
+
+/** Полный адрес для canonical, og:url и hreflang. */
+function abs_url(string $path): string
+{
+    $https = ($_SERVER['HTTPS'] ?? '') === 'on' || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
+    $host = preg_replace('/[^a-z0-9.\-:]/i', '', $_SERVER['HTTP_HOST'] ?? 'localhost');
+    return ($https ? 'https' : 'http') . '://' . $host . $path;
+}
+
+/** Шаблон из app/views/ с переменными; возвращает HTML. */
+function view(string $name, array $vars = []): string
 {
     extract($vars, EXTR_SKIP);
     ob_start();
-    require APP_DIR . '/pages/' . $page . '.php';
-    $content = ob_get_clean();
-    require APP_DIR . '/layout.php';
+    require APP_DIR . '/views/' . $name . '.php';
+    return (string) ob_get_clean();
+}
+
+/** Страница целиком: содержимое в общем макете (шапка, подвал). */
+function render(string $page, array $vars = []): void
+{
+    $vars['content'] = view($page, $vars);
+    echo view('layout', $vars);
 }

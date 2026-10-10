@@ -90,25 +90,31 @@ function migrate(PDO $pdo): void
     }
 }
 
-/** Копия базы перед миграцией: data/backups/site_ГГГГММДД-ЧЧММ_vNNN.sqlite, хранятся последние 10. */
+/** Копия базы перед миграцией (раздел 11.1). */
 function backup_before_migration(PDO $pdo, int $version): void
+{
+    // Упавшая миграция повторяется на каждом запросе: копию этой версии делаем один раз,
+    // иначе повторы вытеснят более старые копии.
+    if (!glob(BACKUPS_DIR . sprintf('/site_*_v%03d.sqlite', $version))) {
+        db_backup($pdo, sprintf('v%03d', $version));
+    }
+}
+
+/** Копия базы data/backups/site_ГГГГММДД-ЧЧММ_{метка}.sqlite; хранятся последние 10. */
+function db_backup(PDO $pdo, string $tag): void
 {
     if (!is_dir(BACKUPS_DIR)) {
         mkdir(BACKUPS_DIR, 0775, true);
     }
-    // Упавшая миграция повторяется на каждом запросе: копию этой версии делаем один раз,
-    // иначе повторы вытеснят более старые копии.
-    if (!glob(BACKUPS_DIR . sprintf('/site_*_v%03d.sqlite', $version))) {
-        $file = BACKUPS_DIR . sprintf('/site_%s_v%03d.sqlite', date('Ymd-Hi'), $version);
-        try {
-            $pdo->exec('VACUUM INTO ' . $pdo->quote($file));
-        } catch (PDOException) {
-            // SQLite старше 3.27 на хостинге: сбрасываем журнал в файл базы и копируем его.
-            $pdo->exec('PRAGMA wal_checkpoint(TRUNCATE)');
-            copy(DB_FILE, $file);
-        }
+    $file = BACKUPS_DIR . sprintf('/site_%s_%s.sqlite', date('Ymd-Hi'), $tag);
+    try {
+        $pdo->exec('VACUUM INTO ' . $pdo->quote($file));
+    } catch (PDOException) {
+        // SQLite старше 3.27 на хостинге: сбрасываем журнал в файл базы и копируем его.
+        $pdo->exec('PRAGMA wal_checkpoint(TRUNCATE)');
+        copy(DB_FILE, $file);
     }
-    $old = glob(BACKUPS_DIR . '/site_*_v[0-9][0-9][0-9].sqlite') ?: [];
+    $old = glob(BACKUPS_DIR . '/site_*.sqlite') ?: [];
     sort($old);
     foreach (array_slice($old, 0, max(0, count($old) - BACKUPS_KEEP)) as $f) {
         unlink($f);
@@ -117,7 +123,20 @@ function backup_before_migration(PDO $pdo, int $version): void
 
 function setting(string $key, ?string $default = null): ?string
 {
-    static $cache = null;
+    $cache = &setting_cache();
     $cache ??= db()->query('SELECT key, value FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
     return $cache[$key] ?? $default;
+}
+
+function &setting_cache(): ?array
+{
+    static $cache = null;
+    return $cache;
+}
+
+/** Сбросить кэш настроек после записи в базу. */
+function setting_reset(): void
+{
+    $cache = &setting_cache();
+    $cache = null;
 }
