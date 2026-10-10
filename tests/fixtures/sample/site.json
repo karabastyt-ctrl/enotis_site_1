@@ -119,6 +119,9 @@
      "price": 45,
      "text": {
       "ru": "Описание вина."
+     },
+     "photo": {
+      "file": "wine-alaverdi.jpg"
      }
     },
     {
@@ -131,18 +134,63 @@
      "grape": {
       "ru": "Ркацители"
      },
-     "vintage": 2019,
+     "vintage": 2018,
      "wine_color": "white",
      "wine_sweet": "dry",
      "price": 38,
-     "text": {}
+     "text": {},
+     "photo": {
+      "file": "wine-rkatsiteli.jpg"
+     }
+    },
+    {
+     "title": {
+      "ru": "Монаструли"
+     },
+     "subtitle": {
+      "ru": "Грузия · Александроули"
+     },
+     "grape": {
+      "ru": "Муджуретули"
+     },
+     "vintage": 2019,
+     "wine_color": "red",
+     "wine_sweet": "dry",
+     "price": null,
+     "text": {
+      "ru": "Без цены — проверка."
+     },
+     "photo": {
+      "file": "wine-monastruli.jpg"
+     }
+    },
+    {
+     "title": {
+      "ru": "Ватопед Мерло"
+     },
+     "subtitle": {
+      "ru": "Греция · Афон, монастырь Ватопед"
+     },
+     "grape": {
+      "ru": "Мерло"
+     },
+     "vintage": 2017,
+     "wine_color": "red",
+     "wine_sweet": "dry",
+     "price": 52,
+     "text": {
+      "ru": "Описание вина."
+     },
+     "photo": {
+      "file": "wine-vatopedi.jpg"
+     }
     },
     {
      "title": {
       "ru": "Мцване"
      },
      "subtitle": {
-      "ru": ""
+      "ru": "Без фото"
      },
      "grape": {
       "ru": "Мцване"
@@ -150,10 +198,8 @@
      "vintage": null,
      "wine_color": "amber",
      "wine_sweet": "dry",
-     "price": null,
-     "text": {
-      "ru": "Янтарное."
-     }
+     "price": 30,
+     "text": {}
     }
    ]
   },
